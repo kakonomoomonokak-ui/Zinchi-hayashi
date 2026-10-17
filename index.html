@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -69,7 +68,7 @@
             justify-content: center;
         }
 
-        /* 左右どちらか片側に寄せる情報パネル（文字がしっかり見えるように調整） */
+        /* 左右どちらか片側に寄せる情報パネル */
         .side-panel {
             background: var(--panel-color);
             padding: 10px 4px;
@@ -229,7 +228,7 @@
         <div id="message"></div>
 
         <div class="game-layout">
-            <!-- 縦書きにすることで、左右どちらのプレイヤーからも見やすいサイド情報パネル -->
+            <!-- 縦書きサイド情報パネル（IDを正しく紐付け） -->
             <div id="side-panel" class="side-panel">
                 <div>手番:<span id="turn-indicator" style="font-weight:bold;">α</span></div>
                 <div>T:<span id="round-count">1</span>/30</div>
@@ -700,3 +699,4 @@
 
 </body>
 </html>
+
