@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>9x9 陣取り対戦ゲーム</title>
+    <style>
+        :root {
+            --color-alpha: #2ecc71; /* 緑 */
+            --color-beta: #3498db;  /* 水色 */
+            --bg-color: #1a1a1a;
+            --panel-color: #2c2c2c;
+            --text-color: #ffffff;
+        }
+        body {
+            font-family: sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            user-select: none;
+        }
+        h1 { font-size: 1.2rem; margin: 5px 0; }
+        
+        /* 画面コンテナ切り替え用 */
+        .screen {
+            display: none;
+            width: 100%;
+            max-width: 400px;
+            flex-direction: column;
+            align-items: center;
+        }
+        .screen.active {
+            display: flex;
+        }
+
+        /* スタート・リザルト画面共通 */
+        .overlay-screen {
+            text-align: center;
+            justify-content: center;
+            align-items: center;
+            min-height: 80vh;
+            gap: 20px;
+        }
+        .overlay-screen h2 {
+            font-size: 1.8rem;
+            margin-bottom: 5px;
+        }
+        .overlay-screen p {
+            font-size: 1.1rem;
+            color: #ccc;
+            line-height: 1.6;
+        }
+
+        /* ボード・パネル関連 */
+        #info-panel {
+            background: var(--panel-color);
+            padding: 10px 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            width: 100%;
+            box-sizing: border-box;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9rem;
+        }
+        .timer-box {
+            font-weight: bold;
+            font-size: 1.1rem;
+            color: #e74c3c;
+        }
+        #board-container {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            display: grid;
+            grid-template-columns: 20px repeat(9, 1fr);
+            grid-template-rows: 20px repeat(9, 1fr);
+            gap: 1px;
+            background: #444;
+            border: 2px solid #444;
+        }
+        .header-cell {
+            background: #333;
+            font-size: 0.6rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #aaa;
+        }
+        .cell {
+            background: #fff;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 1.2rem;
+        }
+        /* 陣地 */
+        .cell.alpha-territory { background-color: #d4efdf !important; }
+        .cell.beta-territory { background-color: #ebf5fb !important; }
+        .cell.selected { background-color: #f9e79f !important; border: 2px solid #f1c40f; }
+        .cell.movable { background-color: #a3e4d7 !important; }
+
+        /* 駒デザイン */
+        .piece {
+            width: 80%;
+            height: 80%;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: bold;
+            color: #fff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            z-index: 2;
+        }
+        .piece.alpha { background-color: var(--color-alpha); border: 2px solid #145a32; }
+        .piece.beta { background-color: var(--color-beta); border: 2px solid #1b4f72; }
+        .piece.stunned { opacity: 0.5; filter: grayscale(50%); }
+
+        /* 重なり表現 */
+        .stack-container {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .stack-container .piece {
+            position: absolute;
+            width: 60%;
+            height: 60%;
+            font-size: 0.5rem;
+        }
+        .stack-container .piece:nth-child(1) { transform: translate(-15%, -15%); }
+        .stack-container .piece:nth-child(2) { transform: translate(15%, 15%); }
+
+        #controls {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+            width: 100%;
+            justify-content: center;
+        }
+        button.action-btn {
+            padding: 10px 20px;
+            background: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        button.action-btn:active { opacity: 0.8; }
+        
+        .big-btn {
+            padding: 15px 40px;
+            font-size: 1.2rem;
+            background: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        .big-btn:active { transform: scale(0.98); }
+
+        #message {
+            margin-top: 10px;
+            font-size: 0.9rem;
+            height: 1.2rem;
+            color: #f39c12;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ① タイトル画面 -->
+    <div id="start-screen" class="screen active overlay-screen">
+        <h1>9x9 陣取り対戦ゲーム</h1>
+        <p>1台のスマホで交互に操作！<br>植林、伐採、剣術を駆使して<br>より多くの陣地を奪い合おう。</p>
+        <button class="big-btn" onclick="startGame()">ゲームスタート</button>
+    </div>
+
+    <!-- ② ゲームプレイ画面 -->
+    <div id="game-screen" class="screen">
+        <h1>9x9 陣取り対戦ゲーム</h1>
+        <div id="info-panel">
+            <div>手番: <span id="turn-indicator" style="font-weight:bold;">α (緑)</span></div>
+            <div>ターン: <span id="round-count">1</span>/30</div>
+            <div class="timer-box"><span id="timer">20</span>秒</div>
+        </div>
+        <div id="message"></div>
+
+        <div id="board-container"></div>
+
+        <div id="controls">
+            <button class="action-btn" onclick="passTurn()">パスする</button>
+            <button class="action-btn" onclick="resetGame()" style="background:#555;">リセット</button>
+        </div>
+    </div>
+
+    <!-- ③ リザルト画面 -->
+    <div id="result-screen" class="screen overlay-screen">
+        <h2>ゲーム終了！</h2>
+        <p id="result-reason" style="font-size: 1rem; color: #f39c12;"></p>
+        <p id="result-score" style="font-size: 1.3rem; font-weight: bold;"></p>
+        <h3 id="result-winner" style="font-size: 1.5rem; margin: 10px 0;"></h3>
+        <button class="big-btn" onclick="startGame()" style="margin-top: 20px;">もう1回プレイする</button>
+    </div>
+
+<script>
+    const COLS = ['1','2','3','4','5','6','7','8','9'];
+    const ROWS = ['A','B','C','D','E','F','G','H','I'];
+
+    let boardState = {};
+    let currentTurn = 'alpha';
+    let roundCount = 1;
+    let timeLeft = 20;
+    let timerInterval = null;
+    let selectedCell = null;
+    let gameOver = false;
+
+    function switchScreen(screenId) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById(screenId).classList.add('active');
+    }
+
+    function initBoard() {
+        boardState = {};
+        for (let r of ROWS) {
+            for (let c of COLS) {
+                boardState[r + c] = { territory: 'none', pieces: [] };
+            }
+        }
+
+        const betaLayout = {
+            'b1': { type: '伐採者', name: '伐' },
+            'b2': { type: '剣士', name: '剣' },
+            'b3': { type: '植林者', name: '植' },
+            'b4': { type: '植林者', name: '植' },
+            'b5': { type: '王', name: '王' },
+            'b6': { type: '植林者', name: '植' },
+            'b7': { type: '植林者', name: '植' },
+            'b8': { type: '剣士', name: '剣' },
+            'b9': { type: '伐採者', name: '伐' }
+        };
+        for (let pos in betaLayout) {
+            boardState['B' + pos[1]].pieces.push({
+                owner: 'beta',
+                type: betaLayout[pos].type,
+                name: betaLayout[pos].name,
+                stunnedTurns: 0
+            });
+        }
+
+        const alphaLayout = {
+            'h1': { type: '伐採者', name: '伐' },
+            'h2': { type: '剣士', name: '剣' },
+            'h3': { type: '植林者', name: '植' },
+            'h4': { type: '植林者', name: '植' },
+            'h5': { type: '王', name: '王' },
+            'h6': { type: '植林者', name: '植' },
+            'h7': { type: '植林者', name: '植' },
+            'h8': { type: '剣士', name: '剣' },
+            'h9': { type: '伐採者', name: '伐' }
+        };
+        for (let pos in alphaLayout) {
+            boardState['H' + pos[1]].pieces.push({
+                owner: 'alpha',
+                type: alphaLayout[pos].type,
+                name: alphaLayout[pos].name,
+                stunnedTurns: 0
+            });
+        }
+    }
+
+    function startGame() {
+        gameOver = false;
+        currentTurn = 'alpha';
+        roundCount = 1;
+        selectedCell = null;
+        document.getElementById('message').innerText = "";
+        initBoard();
+        switchScreen('game-screen');
+        resetTimer();
+        renderBoard();
+    }
+
+    function renderBoard() {
+        const container = document.getElementById('board-container');
+        container.innerHTML = '';
+
+        const emptyCorner = document.createElement('div');
+        emptyCorner.className = 'header-cell';
+        container.appendChild(emptyCorner);
+
+        for (let c of COLS) {
+            const h = document.createElement('div');
+            h.className = 'header-cell';
+            h.innerText = c;
+            container.appendChild(h);
+        }
+
+        for (let rIdx = 0; rIdx < ROWS.length; rIdx++) {
+            const r = ROWS[rIdx];
+            const rh = document.createElement('div');
+            rh.className = 'header-cell';
+            rh.innerText = r;
+            container.appendChild(rh);
+
+            for (let cIdx = 0; cIdx < COLS.length; cIdx++) {
+                const c = COLS[cIdx];
+                const key = r + c;
+                const cellData = boardState[key];
+                const cellDiv = document.createElement('div');
+                cellDiv.className = 'cell';
+                cellDiv.dataset.coord = key;
+
+                if (cellData.territory === 'alpha') cellDiv.classList.add('alpha-territory');
+                if (cellData.territory === 'beta') cellDiv.classList.add('beta-territory');
+                if (selectedCell === key) cellDiv.classList.add('selected');
+
+                if (selectedCell && getMovableCells(selectedCell).includes(key)) {
+                    cellDiv.classList.add('movable');
+                }
+
+                if (cellData.pieces.length > 0) {
+                    if (cellData.pieces.length === 1) {
+                        const p = cellData.pieces[0];
+                        const pDiv = document.createElement('div');
+                        pDiv.className = `piece ${p.owner} ${p.stunnedTurns > 0 ? 'stunned' : ''}`;
+                        pDiv.innerText = p.name;
+                        cellDiv.appendChild(pDiv);
+                    } else {
+                        const stackDiv = document.createElement('div');
+                        stackDiv.className = 'stack-container';
+                        cellData.pieces.forEach(p => {
+                            const pDiv = document.createElement('div');
+                            pDiv.className = `piece ${p.owner} ${p.stunnedTurns > 0 ? 'stunned' : ''}`;
+                            pDiv.innerText = p.name;
+                            stackDiv.appendChild(pDiv);
+                        });
+                        cellDiv.appendChild(stackDiv);
+                    }
+                }
+
+                cellDiv.addEventListener('click', () => onCellClick(key));
+                container.appendChild(cellDiv);
+            }
+        }
+
+        document.getElementById('turn-indicator').innerText = currentTurn === 'alpha' ? 'α (緑)' : 'β (水色)';
+        document.getElementById('turn-indicator').style.color = currentTurn === 'alpha' ? 'var(--color-alpha)' : 'var(--color-beta)';
+        document.getElementById('round-count').innerText = roundCount;
+        document.getElementById('timer').innerText = timeLeft;
+    }
+
+    function getNeighbors(coord) {
+        const rChar = coord[0];
+        const cNum = parseInt(coord[1]);
+        const rIdx = ROWS.indexOf(rChar);
+        const neighbors = [];
+
+        const directions = [
+            [-1, -1], [-1, 0], [-1, 1],
+            [0, -1],           [0, 1],
+            [1, -1],  [1, 0],  [1, 1]
+        ];
+
+        for (let [dr, dc] of directions) {
+            const nr = rIdx + dr;
+            const nc = cNum + dc;
+            if (nr >= 0 && nr < ROWS.length && nc >= 1 && nc <= 9) {
+                neighbors.push(ROWS[nr] + nc);
+            }
+        }
+        return neighbors;
+    }
+
+    function getMovableCells(coord) {
+        const cell = boardState[coord];
+        const activePiece = cell.pieces.find(p => p.owner === currentTurn && p.stunnedTurns === 0);
+        if (!activePiece) return [];
+
+        const neighbors = getNeighbors(coord);
+        const movable = [];
+
+        for (let nCoord of neighbors) {
+            const target = boardState[nCoord];
+            const enemyPiece = target.pieces.find(p => p.owner !== currentTurn);
+
+            if (enemyPiece) {
+                if (activePiece.type === '剣士' && target.pieces.length === 1) {
+                    movable.push(nCoord);
+                }
+            } else {
+                if (target.pieces.length === 0) {
+                    movable.push(nCoord);
+                }
+            }
+        }
+        return movable;
+    }
+
+    function onCellClick(coord) {
+        if (gameOver) return;
+        const cell = boardState[coord];
+
+        if (selectedCell === null) {
+            const hasMyActivePiece = cell.pieces.some(p => p.owner === currentTurn && p.stunnedTurns === 0);
+            if (hasMyActivePiece) {
+                selectedCell = coord;
+                renderBoard();
+            }
+        } else {
+            if (selectedCell === coord) {
+                selectedCell = null;
+                renderBoard();
+                return;
+            }
+
+            const movable = getMovableCells(selectedCell);
+            if (movable.includes(coord)) {
+                executeMove(selectedCell, coord);
+            } else {
+                const hasMyActivePiece = cell.pieces.some(p => p.owner === currentTurn && p.stunnedTurns === 0);
+                if (hasMyActivePiece) {
+                    selectedCell = coord;
+                    renderBoard();
+                } else {
+                    selectedCell = null;
+                    renderBoard();
+                }
+            }
+        }
+    }
+
+    function executeMove(from, to) {
+        const fromCell = boardState[from];
+        const toCell = boardState[to];
+
+        const pieceIdx = fromCell.pieces.findIndex(p => p.owner === currentTurn && p.stunnedTurns === 0);
+        const movingPiece = fromCell.pieces.splice(pieceIdx, 1)[0];
+
+        if (movingPiece.type === '植林者') {
+            fromCell.territory = currentTurn;
+        }
+
+        const enemyPieceIdx = toCell.pieces.findIndex(p => p.owner !== currentTurn);
+        if (enemyPieceIdx !== -1) {
+            const enemyPiece = toCell.pieces[enemyPieceIdx];
+            if (enemyPiece.type === '王') {
+                toCell.pieces.splice(enemyPieceIdx, 1);
+                toCell.pieces.push(movingPiece);
+                endGame(`王が倒されました！`);
+                return;
+            } else {
+                enemyPiece.stunnedTurns = 5;
+            }
+        }
+
+        if (movingPiece.type === '伐採者') {
+            processLumberjack(from, to);
+        }
+
+        toCell.pieces.push(movingPiece);
+
+        if (movingPiece.type === '王') {
+            processKingTerritory(to);
+        }
+
+        selectedCell = null;
+        nextTurn();
+    }
+
+    function processLumberjack(from, to) {
+        const r1 = from[0], c1 = parseInt(from[1]);
+        const r2 = to[0], c2 = parseInt(to[1]);
+        const dr = ROWS.indexOf(r2) - ROWS.indexOf(r1);
+        const dc = c2 - c1;
+
+        const enemyTerritory = (currentTurn === 'alpha' ? 'beta' : 'alpha');
+
+        // 1. 移動先のマスとその左右
+        // 進行方向(dr, dc)に対する直交ベクトル(垂直方向)を求める
+        const clearIfEnemy = (coord) => {
+            if (boardState[coord] && boardState[coord].territory === enemyTerritory) {
+                boardState[coord].territory = 'none';
+            }
+        };
+
+        clearIfEnemy(to);
+
+        // 移動方向が縦（dc === 0）なら左右は横（c1-1, c1+1など、移動後の行で）
+        // 移動方向が横（dr === 0）なら左右は縦（rの上下）
+        // 斜め移動（dr !== 0 && dc !== 0）の場合も含め、移動方向に対する左右のオフセットを定義
+        const r2Idx = ROWS.indexOf(r2);
+        
+        // 垂直方向のベクトル（左右のマスを特定するため）
+        // 例えば上に進む場合、左右は左(-dc, dr)と右(dc, -dr)に相当するが、もっとシンプルに：
+        // 移動ベクトル (dr, dc) に対する左右の方向は (-dc, dr) と (dc, -dr)
+        const leftDr = -dc, leftDc = dr;
+        const rightDr = dc, rightDc = -dr;
+
+        // 移動先の左右
+        const leftToIdx = r2Idx + leftDr;
+        const leftToC = c2 + leftDc;
+        if (leftToIdx >= 0 && leftToIdx < ROWS.length && leftToC >= 1 && leftToC <= 9) {
+            clearIfEnemy(ROWS[leftToIdx] + leftToC);
+        }
+
+        const rightToIdx = r2Idx + rightDr;
+        const rightToC = c2 + rightDc;
+        if (rightToIdx >= 0 && rightToIdx < ROWS.length && rightToC >= 1 && rightToC <= 9) {
+            clearIfEnemy(ROWS[rightToIdx] + rightToC);
+        }
+
+        // 2. その奥のマスとその左右
+        const beyondRIdx = r2Idx + dr;
+        const beyondCNum = c2 + dc;
+        if (beyondRIdx >= 0 && beyondRIdx < ROWS.length && beyondCNum >= 1 && beyondCNum <= 9) {
+            const beyondCoord = ROWS[beyondRIdx] + beyondCNum;
+            clearIfEnemy(beyondCoord);
+
+            // 奥の左右
+            const leftBeyondIdx = beyondRIdx + leftDr;
+            const leftBeyondC = beyondCNum + leftDc;
+            if (leftBeyondIdx >= 0 && leftBeyondIdx < ROWS.length && leftBeyondC >= 1 && leftBeyondC <= 9) {
+                clearIfEnemy(ROWS[leftBeyondIdx] + leftBeyondC);
+            }
+
+            const rightBeyondIdx = beyondRIdx + rightDr;
+            const rightBeyondC = beyondCNum + rightDc;
+            if (rightBeyondIdx >= 0 && rightBeyondIdx < ROWS.length && rightBeyondC >= 1 && rightBeyondC <= 9) {
+                clearIfEnemy(ROWS[rightBeyondIdx] + rightBeyondC);
+            }
+        }
+    }
+
+    function processKingTerritory(kingCoord) {
+        const rChar = kingCoord[0];
+        const cNum = parseInt(kingCoord[1]);
+        const rIdx = ROWS.indexOf(rChar);
+
+        const targets = [];
+        if (rIdx > 0) targets.push(ROWS[rIdx - 1] + cNum);
+        if (rIdx < ROWS.length - 1) targets.push(ROWS[rIdx + 1] + cNum);
+
+        for (let t of targets) {
+            if (boardState[t].territory === 'none') {
+                boardState[t].territory = currentTurn;
+            }
+        }
+    }
+
+    function nextTurn() {
+        for (let r of ROWS) {
+            for (let c of COLS) {
+                const cell = boardState[r + c];
+                cell.pieces.forEach(p => {
+                    if (p.owner === currentTurn && p.stunnedTurns > 0) {
+                        p.stunnedTurns--;
+                        if (p.stunnedTurns === 0 && cell.pieces.length > 1) {
+                            const allyIdx = cell.pieces.findIndex(other => other !== p);
+                            if (allyIdx !== -1) {
+                                const allyPiece = cell.pieces.splice(allyIdx, 1)[0];
+                                const neighbors = getNeighbors(r + c);
+                                const emptyNeighbor = neighbors.find(nCoord => boardState[nCoord].pieces.length === 0);
+                                if (emptyNeighbor) {
+                                    boardState[emptyNeighbor].pieces.push(allyPiece);
+                                } else {
+                                    cell.pieces.push(allyPiece);
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        if (currentTurn === 'beta') {
+            roundCount++;
+            if (roundCount > 30) {
+                endGame("30ターン終了");
+                return;
+            }
+        }
+        currentTurn = currentTurn === 'alpha' ? 'beta' : 'alpha';
+        resetTimer();
+        renderBoard();
+    }
+
+    function passTurn() {
+        if (gameOver) return;
+        setMessage("パスしました。");
+        selectedCell = null;
+        nextTurn();
+    }
+
+    function resetTimer() {
+        clearInterval(timerInterval);
+        timeLeft = 20;
+        timerInterval = setInterval(() => {
+            timeLeft--;
+            document.getElementById('timer').innerText = timeLeft;
+            if (timeLeft <= 0) {
+                clearInterval(timerInterval);
+                setMessage("タイムオーバー！自動でパスします。");
+                passTurn();
+            }
+        }, 1000);
+    }
+
+    function setMessage(msg) {
+        document.getElementById('message').innerText = msg;
+        setTimeout(() => {
+            if(document.getElementById('message').innerText === msg) {
+                document.getElementById('message').innerText = "";
+            }
+        }, 3000);
+    }
+
+    function endGame(reason) {
+        gameOver = true;
+        clearInterval(timerInterval);
+
+        let alphaCount = 0;
+        let betaCount = 0;
+        for (let r of ROWS) {
+            for (let c of COLS) {
+                if (boardState[r + c].territory === 'alpha') alphaCount++;
+                if (boardState[r + c].territory === 'beta') betaCount++;
+            }
+        }
+
+        let winnerMsg = "";
+        let winnerColor = "";
+        if (alphaCount > betaCount) {
+            winnerMsg = "勝者: α (緑) チーム！";
+            winnerColor = "var(--color-alpha)";
+        } else if (betaCount > alphaCount) {
+            winnerMsg = "勝者: β (水色) チーム！";
+            winnerColor = "var(--color-beta)";
+        } else {
+            winnerMsg = "引き分け！";
+            winnerColor = "#fff";
+        }
+
+        document.getElementById('result-reason').innerText = `終了理由: ${reason}`;
+        document.getElementById('result-score').innerText = `陣地数 - α: ${alphaCount} vs β: ${betaCount}`;
+        const winnerEl = document.getElementById('result-winner');
+        winnerEl.innerText = winnerMsg;
+        winnerEl.style.color = winnerColor;
+
+        switchScreen('result-screen');
+    }
+
+    function resetGame() {
+        if(confirm("ゲームをリセットしてタイトルに戻りますか？")) {
+            clearInterval(timerInterval);
+            switchScreen('start-screen');
+        }
+    }
+</script>
+
+</body>
+</html>
