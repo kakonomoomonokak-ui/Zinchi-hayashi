@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -5,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>9x9 陣取り対戦ゲーム</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Yuji+Boku&display=swap'); /* 行書体っぽい和風フォント */
+        @import url('https://fonts.googleapis.com/css2?family=Yuji+Boku&display=swap'); /* 行書体風フォント */
 
         :root {
             --color-alpha: #2ecc71; /* 緑 */
@@ -24,6 +25,8 @@
             flex-direction: column;
             align-items: center;
             user-select: none;
+            min-height: 100vh;
+            justify-content: center;
         }
         h1 { font-size: 1.1rem; margin: 5px 0; text-align: center; }
         
@@ -31,7 +34,7 @@
         .screen {
             display: none;
             width: 100%;
-            max-width: 420px;
+            max-width: 440px;
             flex-direction: column;
             align-items: center;
         }
@@ -44,7 +47,7 @@
             text-align: center;
             justify-content: center;
             align-items: center;
-            min-height: 80vh;
+            min-height: 70vh;
             gap: 20px;
         }
         .overlay-screen h2 {
@@ -57,30 +60,35 @@
             line-height: 1.6;
         }
 
-        /* メインゲームレイアウト：盤面とサイドの情報を横並びにする */
+        /* メインゲームレイアウト：盤面を真ん中にし、サイドに情報を配置 */
         .game-layout {
             display: flex;
             width: 100%;
-            gap: 8px;
+            gap: 10px;
             align-items: center;
+            justify-content: center;
         }
 
-        /* 左右どちらか片側に寄せる情報パネル（90度回転用） */
+        /* 左右どちらか片側に寄せる情報パネル（文字がしっかり見えるように調整） */
         .side-panel {
             background: var(--panel-color);
-            padding: 10px 5px;
+            padding: 10px 4px;
             border-radius: 8px;
-            width: 45px;
+            width: 55px;
             height: 320px;
             box-sizing: border-box;
             display: flex;
             flex-direction: column;
             justify-content: space-around;
             align-items: center;
-            font-size: 0.8rem;
-            /* 文字ごと90度回転させて、お互いから見やすくする */
-            transform: rotate(90deg);
-            white-space: nowrap;
+            font-size: 0.75rem;
+            text-align: center;
+            line-height: 1.3;
+        }
+        .side-panel div {
+            writing-mode: vertical-rl; /* 縦書きにしてお互いから見やすくする */
+            text-orientation: upright;
+            letter-spacing: 1px;
         }
         .timer-box {
             font-weight: bold;
@@ -89,7 +97,7 @@
 
         #board-container {
             width: 100%;
-            max-width: 340px;
+            max-width: 330px;
             aspect-ratio: 1 / 1;
             display: grid;
             grid-template-columns: 18px repeat(9, 1fr);
@@ -121,7 +129,7 @@
         .cell.selected { background-color: #f9e79f !important; border: 2px solid #f1c40f; }
         .cell.movable { background-color: #a3e4d7 !important; }
 
-        /* 駒デザイン（行書体風フォント適用） */
+        /* 駒デザイン（行書体フォント適用） */
         .piece {
             width: 80%;
             height: 80%;
@@ -129,7 +137,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-family: 'Yuji Boku', serif; /* 行書体フォント */
+            font-family: 'Yuji Boku', serif;
             font-size: 0.85rem;
             font-weight: bold;
             color: #fff;
@@ -140,7 +148,6 @@
         .piece.beta { 
             background-color: var(--color-beta); 
             border: 2px solid #1b4f72; 
-            /* 向向かい合って遊ぶ際に読みやすいよう180度回転 */
             transform: rotate(180deg); 
         }
         .piece.stunned { opacity: 0.5; filter: grayscale(50%); }
@@ -198,8 +205,9 @@
         .big-btn:active { transform: scale(0.98); }
 
         #message {
-            margin-top: 10px;
-            font-size: 0.9rem;
+            margin-top: 5px;
+            margin-bottom: 10px;
+            font-size: 0.85rem;
             height: 1.2rem;
             color: #f39c12;
             text-align: center;
@@ -221,14 +229,14 @@
         <div id="message"></div>
 
         <div class="game-layout">
-            <!-- 90度回転させて左右どちらかからでも見やすいサイド情報パネル -->
+            <!-- 縦書きにすることで、左右どちらのプレイヤーからも見やすいサイド情報パネル -->
             <div id="side-panel" class="side-panel">
-                <div>手番: <span id="turn-indicator" style="font-weight:bold;">α (緑)</span></div>
-                <div>T: <span id="round-count">1</span>/30</div>
+                <div>手番:<span id="turn-indicator" style="font-weight:bold;">α</span></div>
+                <div>T:<span id="round-count">1</span>/30</div>
                 <div class="timer-box"><span id="timer">20</span>秒</div>
             </div>
 
-            <!-- 盤面 -->
+            <!-- 盤面（完全な真ん中配置） -->
             <div id="board-container"></div>
         </div>
 
@@ -388,7 +396,7 @@
             }
         }
 
-        document.getElementById('turn-indicator').innerText = currentTurn === 'alpha' ? 'α (緑)' : 'β (水色)';
+        document.getElementById('turn-indicator').innerText = currentTurn === 'alpha' ? 'α' : 'β';
         document.getElementById('turn-indicator').style.color = currentTurn === 'alpha' ? 'var(--color-alpha)' : 'var(--color-beta)';
         document.getElementById('round-count').innerText = roundCount;
         document.getElementById('timer').innerText = timeLeft;
