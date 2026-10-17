@@ -1,9 +1,12 @@
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>9x9 陣取り対戦ゲーム</title>
+    <!-- PeerJSライブラリの読み込み（オンライン対戦用・完全無料） -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Yuji+Boku&display=swap');
 
@@ -43,24 +46,75 @@
             justify-content: center;
             align-items: center;
             min-height: 70vh;
-            gap: 20px;
+            gap: 15px;
         }
         .overlay-screen h2 { font-size: 1.8rem; margin-bottom: 5px; }
-        .overlay-screen p { font-size: 1.1rem; color: #ccc; line-height: 1.6; }
+        .overlay-screen p { font-size: 1.0rem; color: #ccc; line-height: 1.5; }
 
-        /* 盤面を完全に真ん中にし、両サイドにスペースを取るレイアウト */
+        /* ルール説明画面 */
+        .rule-screen {
+            text-align: left;
+            justify-content: flex-start;
+            padding: 15px;
+            box-sizing: border-box;
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+        .rule-screen h2 { text-align: center; width: 100%; }
+        .rule-content {
+            font-size: 0.85rem;
+            color: #ddd;
+            line-height: 1.5;
+            width: 100%;
+            margin-bottom: 15px;
+        }
+        .rule-content h3 {
+            color: #f39c12;
+            font-size: 0.95rem;
+            margin: 10px 0 3px 0;
+            border-bottom: 1px solid #444;
+            padding-bottom: 2px;
+        }
+        .rule-content ul { margin: 5px 0; padding-left: 20px; }
+        .rule-content li { margin-bottom: 3px; }
+
+        /* オンライン対戦ロビー画面 */
+        .lobby-box {
+            background: var(--panel-color);
+            padding: 20px;
+            border-radius: 10px;
+            width: 85%;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .lobby-box input {
+            padding: 10px;
+            font-size: 1.2rem;
+            text-align: center;
+            border-radius: 5px;
+            border: none;
+            width: 80%;
+            margin: 0 auto;
+        }
+        .lobby-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
         .game-layout {
             display: flex;
             width: 100%;
-            gap: 12px;
+            gap: 10px;
             align-items: center;
             justify-content: center;
         }
 
-        /* 左右どちらからでも見やすいように文字を縦書き配置したサイドパネル */
         .side-panel {
             background: var(--panel-color);
-            padding: 15px 4px;
+            padding: 10px 4px;
             border-radius: 8px;
             width: 55px;
             height: 320px;
@@ -69,19 +123,17 @@
             flex-direction: column;
             justify-content: space-around;
             align-items: center;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             text-align: center;
         }
-        .side-panel .v-text {
+        .side-panel div {
             writing-mode: vertical-rl;
             text-orientation: upright;
-            letter-spacing: 2px;
+            letter-spacing: 1px;
         }
         .timer-box {
             font-weight: bold;
             color: #e74c3c;
-            writing-mode: vertical-rl;
-            text-orientation: upright;
         }
 
         #board-container {
@@ -117,7 +169,6 @@
         .cell.selected { background-color: #f9e79f !important; border: 2px solid #f1c40f; }
         .cell.movable { background-color: #a3e4d7 !important; }
 
-        /* 行書体フォントを適用した駒 */
         .piece {
             width: 80%;
             height: 80%;
@@ -136,7 +187,7 @@
         .piece.beta { 
             background-color: var(--color-beta); 
             border: 2px solid #1b4f72; 
-            transform: rotate(180deg); /* 対面で読めるように180度回転 */
+            transform: rotate(180deg); 
         }
         .piece.stunned { opacity: 0.5; filter: grayscale(50%); }
 
@@ -179,8 +230,8 @@
         button.action-btn:active { opacity: 0.8; }
         
         .big-btn {
-            padding: 15px 40px;
-            font-size: 1.2rem;
+            padding: 12px 25px;
+            font-size: 1.05rem;
             background: #27ae60;
             color: white;
             border: none;
@@ -190,6 +241,7 @@
             box-shadow: 0 4px 6px rgba(0,0,0,0.3);
         }
         .big-btn:active { transform: scale(0.98); }
+        .sub-btn { background: #555; }
 
         #message {
             margin-top: 5px;
@@ -206,24 +258,67 @@
     <!-- ① タイトル画面 -->
     <div id="start-screen" class="screen active overlay-screen">
         <h1>9x9 陣取り対戦ゲーム</h1>
-        <p>1台のスマホで交互に操作！<br>植林、伐採、剣術を駆使して<br>より多くの陣地を奪い合おう。</p>
-        <button class="big-btn" onclick="startGame()">ゲームスタート</button>
+        <p>植林、伐採、剣術を駆使して<br>より多くの陣地を奪い合おう。</p>
+        <button class="big-btn" onclick="startLocalGame()">ひとりで遊ぶ (1台対面)</button>
+        <button class="big-btn" onclick="openOnlineLobby()" style="background: #2980b9;">オンライン対戦 (3桁数字)</button>
+        <button class="big-btn sub-btn" onclick="switchScreen('rule-screen')">遊び方（ルール）</button>
+    </div>
+
+    <!-- 🌐 オンライン対戦ロビー画面 -->
+    <div id="online-screen" class="screen overlay-screen">
+        <h2>オンライン対戦</h2>
+        <div class="lobby-box">
+            <p style="font-size: 0.9rem; margin:0;">3桁の数字を入力してください<br>(例: 123)</p>
+            <input type="text" id="room-input" maxlength="3" placeholder="000">
+            <div id="lobby-status" style="font-size: 0.85rem; color: #f39c12; min-height: 1.2rem;"></div>
+            <div class="lobby-buttons">
+                <button class="big-btn" onclick="connectOnlineRoom()" style="font-size:0.9rem; padding:10px 15px;">部屋に入る/作る</button>
+                <button class="big-btn sub-btn" onclick="switchScreen('start-screen')" style="font-size:0.9rem; padding:10px 15px;">戻る</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 💡 ルール説明画面 -->
+    <div id="rule-screen" class="screen overlay-screen rule-screen">
+        <h2>遊び方・ルール</h2>
+        <div class="rule-content">
+            <h3>🎯 概要・目的</h3>
+            <ul>
+                <li>9×9の盤面で、より多くの陣地を広げた方の勝ち！</li>
+                <li>1ターン制限時間は20秒（時間切れは自動パス）。全30ターン制。</li>
+            </ul>
+            <h3>🛡️ 駒の種類と能力</h3>
+            <ul>
+                <li><b>共通移動</b>: すべての駒が全方向へ1マス移動可能。</li>
+                <li><b>王</b>: ターン終了時に前後のマスに陣地を作る（上書き不可）。剣士に倒されるとゲーム終了条件の一つになる。</li>
+                <li><b>剣士</b>: 敵の駒がいるマスに飛び込み、王以外の駒なら5ターン行動不能にして被さる（王は撃破可能）。</li>
+                <li><b>植林者</b>: 動いた元のマスに自分の陣地を作る。</li>
+                <li><b>伐採者</b>: 移動先、その左右、およびその奥にある相手の陣地を消去する。</li>
+            </ul>
+            <h3>⚔️ 特別ルール</h3>
+            <ul>
+                <li><b>押し出し</b>: 剣士に行動不能にされたマスには味方の駒が重なれるが、解除された瞬間、周囲の空きマスに押し出される。</li>
+            </ul>
+            <h3>🏆 勝利条件</h3>
+            <ul>
+                <li>王が剣士に倒される、または30ターン終了時に多くの陣地を持っているプレイヤーの勝ち。</li>
+            </ul>
+        </div>
+        <button class="big-btn sub-btn" onclick="switchScreen('start-screen')" style="margin-bottom: 15px;">タイトルに戻る</button>
     </div>
 
     <!-- ② ゲームプレイ画面 -->
     <div id="game-screen" class="screen">
-        <h1>9x9 陣取り対戦ゲーム</h1>
+        <h1>9x9 陣取り対戦ゲーム <span id="mode-badge" style="font-size:0.7rem; color:#2ecc71;"></span></h1>
         <div id="message"></div>
 
         <div class="game-layout">
-            <!-- 縦書きサイド情報パネル -->
             <div class="side-panel">
                 <div class="v-text">手番:<span id="turn-indicator" style="font-weight:bold;">α</span></div>
                 <div class="v-text">T:<span id="round-count">1</span>/30</div>
                 <div class="timer-box"><span id="timer">20</span>秒</div>
             </div>
 
-            <!-- 盤面（完全な中央配置） -->
             <div id="board-container"></div>
         </div>
 
@@ -254,9 +349,19 @@
     let selectedCell = null;
     let gameOver = false;
 
+    // オンライン対戦用変数
+    let isOnline = false;
+    let peer = null;
+    let conn = null;
+    let myRole = 'alpha'; // ホストがalpha、ゲストがbeta
+
     function switchScreen(screenId) {
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
         document.getElementById(screenId).classList.add('active');
+    }
+
+    function openOnlineLobby() {
+        switchScreen('online-screen');
     }
 
     function initBoard() {
@@ -308,7 +413,84 @@
         }
     }
 
-    function startGame() {
+    function startLocalGame() {
+        isOnline = false;
+        myRole = 'alpha';
+        document.getElementById('mode-badge').innerText = "[ローカル対戦]";
+        startGameCommon();
+    }
+
+    // --- PeerJS オンライン接続処理 ---
+    function connectOnlineRoom() {
+        const roomNum = document.getElementById('room-input').value.trim();
+        if (roomNum.length !== 3) {
+            document.getElementById('lobby-status').innerText = "3桁の数字を入力してください";
+            return;
+        }
+
+        isOnline = true;
+        document.getElementById('lobby-status').innerText = "接続中...";
+
+        // 既存の接続があれば閉じる
+        if (peer) peer.destroy();
+
+        // プレフィックスを付けてPeerIDを作成（重複防止）
+        const hostId = "jintori-room-" + roomNum;
+        
+        // まず自分がホストとして部屋を作ってみる
+        peer = new Peer(hostId);
+
+        peer.on('open', (id) => {
+            // ホストとして部屋の作成に成功した場合
+            myRole = 'alpha';
+            document.getElementById('lobby-status').innerText = "部屋を作りました。相手の参加を待っています...";
+            
+            peer.on('connection', (connection) => {
+                conn = connection;
+                setupConnection();
+                document.getElementById('lobby-status').innerText = "相手が参加しました！ゲーム開始！";
+                setTimeout(() => {
+                    document.getElementById('mode-badge').innerText = "[オンライン: α側]";
+                    startGameCommon();
+                }, 1000);
+            });
+        });
+
+        peer.on('error', (err) => {
+            // すでに部屋が存在する場合はゲストとして参加を試みる
+            if (err.type === 'unavailable-id') {
+                peer.destroy();
+                peer = new Peer(); // ランダムIDで接続用Peer作成
+
+                peer.on('open', () => {
+                    myRole = 'beta';
+                    conn = peer.connect(hostId);
+                    setupConnection();
+                    document.getElementById('lobby-status').innerText = "部屋に参加しました！ゲーム開始！";
+                    setTimeout(() => {
+                        document.getElementById('mode-badge').innerText = "[オンライン: β側]";
+                        startGameCommon();
+                    }, 1000);
+                });
+            } else {
+                document.getElementById('lobby-status').innerText = "接続エラーが発生しました";
+            }
+        });
+    }
+
+    function setupConnection() {
+        conn.on('data', (data) => {
+            if (data.type === 'MOVE') {
+                executeMove(data.from, data.to, true);
+            } else if (data.type === 'PASS') {
+                passTurn(true);
+            } else if (data.type === 'RESET') {
+                resetGame(true);
+            }
+        });
+    }
+
+    function startGameCommon() {
         gameOver = false;
         currentTurn = 'alpha';
         roundCount = 1;
@@ -318,6 +500,14 @@
         switchScreen('game-screen');
         resetTimer();
         renderBoard();
+    }
+
+    function startGame() {
+        if (isOnline) {
+            alert("オンライン対戦中は部屋番号から再接続してください");
+            return;
+        }
+        startLocalGame();
     }
 
     function renderBoard() {
@@ -438,6 +628,10 @@
 
     function onCellClick(coord) {
         if (gameOver) return;
+
+        // オンライン対戦時、自分の手番以外は操作禁止
+        if (isOnline && currentTurn !== myRole) return;
+
         const cell = boardState[coord];
 
         if (selectedCell === null) {
@@ -455,6 +649,10 @@
 
             const movable = getMovableCells(selectedCell);
             if (movable.includes(coord)) {
+                // オンライン対戦時は相手に通信送信
+                if (isOnline && conn) {
+                    conn.send({ type: 'MOVE', from: selectedCell, to: coord });
+                }
                 executeMove(selectedCell, coord);
             } else {
                 const hasMyActivePiece = cell.pieces.some(p => p.owner === currentTurn && p.stunnedTurns === 0);
@@ -469,11 +667,12 @@
         }
     }
 
-    function executeMove(from, to) {
+    function executeMove(from, to, isRemote = false) {
         const fromCell = boardState[from];
         const toCell = boardState[to];
 
         const pieceIdx = fromCell.pieces.findIndex(p => p.owner === currentTurn && p.stunnedTurns === 0);
+        if (pieceIdx === -1) return;
         const movingPiece = fromCell.pieces.splice(pieceIdx, 1)[0];
 
         if (movingPiece.type === '植林者') {
@@ -612,8 +811,14 @@
         renderBoard();
     }
 
-    function passTurn() {
+    function passTurn(isRemote = false) {
         if (gameOver) return;
+        if (isOnline && !isRemote && currentTurn !== myRole) return;
+
+        if (isOnline && !isRemote && conn) {
+            conn.send({ type: 'PASS' });
+        }
+
         setMessage("パスしました。");
         selectedCell = null;
         nextTurn();
@@ -677,8 +882,11 @@
         switchScreen('result-screen');
     }
 
-    function resetGame() {
-        if(confirm("ゲームをリセットしてタイトルに戻りますか？")) {
+    function resetGame(isRemote = false) {
+        if (!isRemote && isOnline && conn) {
+            conn.send({ type: 'RESET' });
+        }
+        if(isRemote || confirm("ゲームをリセットしてタイトルに戻りますか？")) {
             clearInterval(timerInterval);
             switchScreen('start-screen');
         }
