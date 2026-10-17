@@ -5,11 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>9x9 陣取り対戦ゲーム</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Yuji+Boku&display=swap'); /* 行書体フォント */
+        @import url('https://fonts.googleapis.com/css2?family=Yuji+Boku&display=swap');
 
         :root {
-            --color-alpha: #2ecc71; /* 緑 */
-            --color-beta: #3498db;  /* 水色 */
+            --color-alpha: #2ecc71;
+            --color-beta: #3498db;
             --bg-color: #1a1a1a;
             --panel-color: #2c2c2c;
             --text-color: #ffffff;
@@ -29,7 +29,6 @@
         }
         h1 { font-size: 1.1rem; margin: 5px 0; text-align: center; }
         
-        /* 画面コンテナ切り替え用 */
         .screen {
             display: none;
             width: 100%;
@@ -37,11 +36,8 @@
             flex-direction: column;
             align-items: center;
         }
-        .screen.active {
-            display: flex;
-        }
+        .screen.active { display: flex; }
 
-        /* スタート・リザルト画面共通 */
         .overlay-screen {
             text-align: center;
             justify-content: center;
@@ -49,41 +45,34 @@
             min-height: 70vh;
             gap: 20px;
         }
-        .overlay-screen h2 {
-            font-size: 1.8rem;
-            margin-bottom: 5px;
-        }
-        .overlay-screen p {
-            font-size: 1.1rem;
-            color: #ccc;
-            line-height: 1.6;
-        }
+        .overlay-screen h2 { font-size: 1.8rem; margin-bottom: 5px; }
+        .overlay-screen p { font-size: 1.1rem; color: #ccc; line-height: 1.6; }
 
-        /* メインゲームレイアウト：盤面を完全に真ん中に配置し、両サイドに情報を割り振るか片側に綺麗に収める */
+        /* 盤面を完全に真ん中にし、両サイドにスペースを取るレイアウト */
         .game-layout {
             display: flex;
             width: 100%;
-            gap: 8px;
+            gap: 12px;
             align-items: center;
             justify-content: center;
         }
 
-        /* サイドパネル（縦書きで手番・ターン・秒数をしっかり表示） */
+        /* 左右どちらからでも見やすいように文字を縦書き配置したサイドパネル */
         .side-panel {
             background: var(--panel-color);
             padding: 15px 4px;
             border-radius: 8px;
-            width: 60px;
+            width: 55px;
             height: 320px;
             box-sizing: border-box;
             display: flex;
             flex-direction: column;
             justify-content: space-around;
             align-items: center;
-            font-size: 0.75rem;
+            font-size: 0.8rem;
             text-align: center;
         }
-        .side-panel .vertical-text {
+        .side-panel .v-text {
             writing-mode: vertical-rl;
             text-orientation: upright;
             letter-spacing: 2px;
@@ -123,13 +112,12 @@
             cursor: pointer;
             font-size: 1.2rem;
         }
-        /* 陣地 */
         .cell.alpha-territory { background-color: #d4efdf !important; }
         .cell.beta-territory { background-color: #ebf5fb !important; }
         .cell.selected { background-color: #f9e79f !important; border: 2px solid #f1c40f; }
         .cell.movable { background-color: #a3e4d7 !important; }
 
-        /* 駒デザイン（行書体フォント適用） */
+        /* 行書体フォントを適用した駒 */
         .piece {
             width: 80%;
             height: 80%;
@@ -148,11 +136,10 @@
         .piece.beta { 
             background-color: var(--color-beta); 
             border: 2px solid #1b4f72; 
-            transform: rotate(180deg); 
+            transform: rotate(180deg); /* 対面で読めるように180度回転 */
         }
         .piece.stunned { opacity: 0.5; filter: grayscale(50%); }
 
-        /* 重なり表現 */
         .stack-container {
             position: absolute;
             width: 100%;
@@ -229,14 +216,14 @@
         <div id="message"></div>
 
         <div class="game-layout">
-            <!-- 縦書きでどちらからも見やすいサイド情報パネル -->
+            <!-- 縦書きサイド情報パネル -->
             <div class="side-panel">
-                <div class="vertical-text">手番:<span id="turn-indicator" style="font-weight:bold;">α</span></div>
-                <div class="vertical-text">T:<span id="round-count">1</span>/30</div>
+                <div class="v-text">手番:<span id="turn-indicator" style="font-weight:bold;">α</span></div>
+                <div class="v-text">T:<span id="round-count">1</span>/30</div>
                 <div class="timer-box"><span id="timer">20</span>秒</div>
             </div>
 
-            <!-- 盤面（完全な真ん中配置） -->
+            <!-- 盤面（完全な中央配置） -->
             <div id="board-container"></div>
         </div>
 
