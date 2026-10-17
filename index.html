@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>9x9 陣取り対戦ゲーム</title>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Yuji+Boku&display=swap'); /* 行書体っぽい和風フォント */
+
         :root {
             --color-alpha: #2ecc71; /* 緑 */
             --color-beta: #3498db;  /* 水色 */
@@ -23,13 +25,13 @@
             align-items: center;
             user-select: none;
         }
-        h1 { font-size: 1.2rem; margin: 5px 0; }
+        h1 { font-size: 1.1rem; margin: 5px 0; text-align: center; }
         
         /* 画面コンテナ切り替え用 */
         .screen {
             display: none;
             width: 100%;
-            max-width: 400px;
+            max-width: 420px;
             flex-direction: column;
             align-items: center;
         }
@@ -55,37 +57,50 @@
             line-height: 1.6;
         }
 
-        /* ボード・パネル関連 */
-        #info-panel {
-            background: var(--panel-color);
-            padding: 10px 15px;
-            border-radius: 8px;
-            margin-bottom: 10px;
+        /* メインゲームレイアウト：盤面とサイドの情報を横並びにする */
+        .game-layout {
+            display: flex;
             width: 100%;
+            gap: 8px;
+            align-items: center;
+        }
+
+        /* 左右どちらか片側に寄せる情報パネル（90度回転用） */
+        .side-panel {
+            background: var(--panel-color);
+            padding: 10px 5px;
+            border-radius: 8px;
+            width: 45px;
+            height: 320px;
             box-sizing: border-box;
             display: flex;
-            justify-content: space-between;
+            flex-direction: column;
+            justify-content: space-around;
             align-items: center;
-            font-size: 0.9rem;
+            font-size: 0.8rem;
+            /* 文字ごと90度回転させて、お互いから見やすくする */
+            transform: rotate(90deg);
+            white-space: nowrap;
         }
         .timer-box {
             font-weight: bold;
-            font-size: 1.1rem;
             color: #e74c3c;
         }
+
         #board-container {
             width: 100%;
+            max-width: 340px;
             aspect-ratio: 1 / 1;
             display: grid;
-            grid-template-columns: 20px repeat(9, 1fr);
-            grid-template-rows: 20px repeat(9, 1fr);
+            grid-template-columns: 18px repeat(9, 1fr);
+            grid-template-rows: 18px repeat(9, 1fr);
             gap: 1px;
             background: #444;
             border: 2px solid #444;
         }
         .header-cell {
             background: #333;
-            font-size: 0.6rem;
+            font-size: 0.55rem;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -106,7 +121,7 @@
         .cell.selected { background-color: #f9e79f !important; border: 2px solid #f1c40f; }
         .cell.movable { background-color: #a3e4d7 !important; }
 
-        /* 駒デザイン */
+        /* 駒デザイン（行書体風フォント適用） */
         .piece {
             width: 80%;
             height: 80%;
@@ -114,14 +129,20 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 0.7rem;
+            font-family: 'Yuji Boku', serif; /* 行書体フォント */
+            font-size: 0.85rem;
             font-weight: bold;
             color: #fff;
             box-shadow: 0 2px 4px rgba(0,0,0,0.3);
             z-index: 2;
         }
         .piece.alpha { background-color: var(--color-alpha); border: 2px solid #145a32; }
-        .piece.beta { background-color: var(--color-beta); border: 2px solid #1b4f72; }
+        .piece.beta { 
+            background-color: var(--color-beta); 
+            border: 2px solid #1b4f72; 
+            /* 向向かい合って遊ぶ際に読みやすいよう180度回転 */
+            transform: rotate(180deg); 
+        }
         .piece.stunned { opacity: 0.5; filter: grayscale(50%); }
 
         /* 重なり表現 */
@@ -137,10 +158,12 @@
             position: absolute;
             width: 60%;
             height: 60%;
-            font-size: 0.5rem;
+            font-size: 0.6rem;
         }
-        .stack-container .piece:nth-child(1) { transform: translate(-15%, -15%); }
-        .stack-container .piece:nth-child(2) { transform: translate(15%, 15%); }
+        .stack-container .piece.alpha:nth-child(1) { transform: translate(-15%, -15%); }
+        .stack-container .piece.alpha:nth-child(2) { transform: translate(15%, 15%); }
+        .stack-container .piece.beta:nth-child(1) { transform: translate(-15%, -15%) rotate(180deg); }
+        .stack-container .piece.beta:nth-child(2) { transform: translate(15%, 15%) rotate(180deg); }
 
         #controls {
             margin-top: 15px;
@@ -195,14 +218,19 @@
     <!-- ② ゲームプレイ画面 -->
     <div id="game-screen" class="screen">
         <h1>9x9 陣取り対戦ゲーム</h1>
-        <div id="info-panel">
-            <div>手番: <span id="turn-indicator" style="font-weight:bold;">α (緑)</span></div>
-            <div>ターン: <span id="round-count">1</span>/30</div>
-            <div class="timer-box"><span id="timer">20</span>秒</div>
-        </div>
         <div id="message"></div>
 
-        <div id="board-container"></div>
+        <div class="game-layout">
+            <!-- 90度回転させて左右どちらかからでも見やすいサイド情報パネル -->
+            <div id="side-panel" class="side-panel">
+                <div>手番: <span id="turn-indicator" style="font-weight:bold;">α (緑)</span></div>
+                <div>T: <span id="round-count">1</span>/30</div>
+                <div class="timer-box"><span id="timer">20</span>秒</div>
+            </div>
+
+            <!-- 盤面 -->
+            <div id="board-container"></div>
+        </div>
 
         <div id="controls">
             <button class="action-btn" onclick="passTurn()">パスする</button>
@@ -492,8 +520,6 @@
 
         const enemyTerritory = (currentTurn === 'alpha' ? 'beta' : 'alpha');
 
-        // 1. 移動先のマスとその左右
-        // 進行方向(dr, dc)に対する直交ベクトル(垂直方向)を求める
         const clearIfEnemy = (coord) => {
             if (boardState[coord] && boardState[coord].territory === enemyTerritory) {
                 boardState[coord].territory = 'none';
@@ -502,18 +528,10 @@
 
         clearIfEnemy(to);
 
-        // 移動方向が縦（dc === 0）なら左右は横（c1-1, c1+1など、移動後の行で）
-        // 移動方向が横（dr === 0）なら左右は縦（rの上下）
-        // 斜め移動（dr !== 0 && dc !== 0）の場合も含め、移動方向に対する左右のオフセットを定義
         const r2Idx = ROWS.indexOf(r2);
-        
-        // 垂直方向のベクトル（左右のマスを特定するため）
-        // 例えば上に進む場合、左右は左(-dc, dr)と右(dc, -dr)に相当するが、もっとシンプルに：
-        // 移動ベクトル (dr, dc) に対する左右の方向は (-dc, dr) と (dc, -dr)
         const leftDr = -dc, leftDc = dr;
         const rightDr = dc, rightDc = -dr;
 
-        // 移動先の左右
         const leftToIdx = r2Idx + leftDr;
         const leftToC = c2 + leftDc;
         if (leftToIdx >= 0 && leftToIdx < ROWS.length && leftToC >= 1 && leftToC <= 9) {
@@ -522,18 +540,16 @@
 
         const rightToIdx = r2Idx + rightDr;
         const rightToC = c2 + rightDc;
-        if (rightToIdx >= 0 && rightToIdx < ROWS.length && rightToC >= 1 && rightToC <= 9) {
+        if (rightToIdx >= 0 && rightToIdx < ROWS.length && rightToC <= 9) {
             clearIfEnemy(ROWS[rightToIdx] + rightToC);
         }
 
-        // 2. その奥のマスとその左右
         const beyondRIdx = r2Idx + dr;
         const beyondCNum = c2 + dc;
         if (beyondRIdx >= 0 && beyondRIdx < ROWS.length && beyondCNum >= 1 && beyondCNum <= 9) {
             const beyondCoord = ROWS[beyondRIdx] + beyondCNum;
             clearIfEnemy(beyondCoord);
 
-            // 奥の左右
             const leftBeyondIdx = beyondRIdx + leftDr;
             const leftBeyondC = beyondCNum + leftDc;
             if (leftBeyondIdx >= 0 && leftBeyondIdx < ROWS.length && leftBeyondC >= 1 && leftBeyondC <= 9) {
