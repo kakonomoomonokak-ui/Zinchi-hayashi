@@ -148,7 +148,7 @@
             border: 2px solid #444;
             transition: transform 0.3s ease;
         }
-        /* β側の時は盤面全体を180度回転しつつ、文字の向きを個別に直す */
+        /* β側の時は盤面を180度回転させる */
         #board-container.rotated {
             transform: rotate(180deg);
         }
@@ -193,26 +193,26 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.3);
             z-index: 2;
         }
-        
+
         /* 
           【基本（α側視点）】
-          - αの駒（自分の駒）：正位置（0deg）
-          - βの駒（相手の駒）：対面の相手から正しく見えるよう180度回転（反対に見える）
+          - αの駒（自分の駒）：まっすぐ正しく読める (0deg)
+          - βの駒（相手の駒）：逆さまに見える (180deg)
         */
         .piece.alpha { background-color: var(--color-alpha); border: 2px solid #145a32; transform: rotate(0deg); }
         .piece.beta  { background-color: var(--color-beta);  border: 2px solid #1b4f72; transform: rotate(180deg); }
         .piece.stunned { opacity: 0.5; filter: grayscale(50%); }
 
         /* 
-          【β側視点（rotated）】
-          - 盤面が180度回転しているため、α側の文字が逆さまにならないようさらに180度（計0deg、つまり正位置）にし、
-          - β側の文字は自分の手元から正しく読めるように反転（0deg）させる。
+          【β側視点（rotated / 盤面が180度回転している状態）】
+          - 盤面が回転しているため、α側の文字（相手）をさらに180度回して「逆さま」にする (180deg)
+          - β側の文字（自分）を180度回して「まっすぐ正しく読める」ようにする (0deg)
         */
         #board-container.rotated .piece.alpha {
-            transform: rotate(180deg); /* 相手（α）の駒が反対に見える */
+            transform: rotate(180deg); 
         }
         #board-container.rotated .piece.beta {
-            transform: rotate(0deg);   /* 自分（β）の駒が正しく見える */
+            transform: rotate(0deg);   
         }
 
         .stack-container {
@@ -772,7 +772,7 @@
 
             const rightBeyondIdx = beyondRIdx + rightDr;
             const rightBeyondC = beyondCNum + rightDc;
-            if (rightBeyondIdx >= 0 && rightBeyondIdx < ROWS.length && rightBeyondC >= 1 && rightBeyondC <= 9) {
+            if (rightBeyondIdx >= 0 && rightBeyondIdx < ROWS.length && rightBeyondC <= 9) {
                 clearIfEnemy(ROWS[rightBeyondIdx] + rightBeyondC);
             }
         }
