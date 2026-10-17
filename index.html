@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>9x9 陣取り対戦ゲーム</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Yuji+Boku&display=swap'); /* 行書体風フォント */
+        @import url('https://fonts.googleapis.com/css2?family=Yuji+Boku&display=swap'); /* 行書体フォント */
 
         :root {
             --color-alpha: #2ecc71; /* 緑 */
@@ -23,9 +23,9 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            user-select: none;
-            min-height: 100vh;
             justify-content: center;
+            min-height: 100vh;
+            user-select: none;
         }
         h1 { font-size: 1.1rem; margin: 5px 0; text-align: center; }
         
@@ -59,21 +59,21 @@
             line-height: 1.6;
         }
 
-        /* メインゲームレイアウト：盤面を真ん中にし、サイドに情報を配置 */
+        /* メインゲームレイアウト：盤面を完全に真ん中に配置し、両サイドに情報を割り振るか片側に綺麗に収める */
         .game-layout {
             display: flex;
             width: 100%;
-            gap: 10px;
+            gap: 8px;
             align-items: center;
             justify-content: center;
         }
 
-        /* 左右どちらか片側に寄せる情報パネル */
+        /* サイドパネル（縦書きで手番・ターン・秒数をしっかり表示） */
         .side-panel {
             background: var(--panel-color);
-            padding: 10px 4px;
+            padding: 15px 4px;
             border-radius: 8px;
-            width: 55px;
+            width: 60px;
             height: 320px;
             box-sizing: border-box;
             display: flex;
@@ -82,16 +82,17 @@
             align-items: center;
             font-size: 0.75rem;
             text-align: center;
-            line-height: 1.3;
         }
-        .side-panel div {
-            writing-mode: vertical-rl; /* 縦書きにしてお互いから見やすくする */
+        .side-panel .vertical-text {
+            writing-mode: vertical-rl;
             text-orientation: upright;
-            letter-spacing: 1px;
+            letter-spacing: 2px;
         }
         .timer-box {
             font-weight: bold;
             color: #e74c3c;
+            writing-mode: vertical-rl;
+            text-orientation: upright;
         }
 
         #board-container {
@@ -228,10 +229,10 @@
         <div id="message"></div>
 
         <div class="game-layout">
-            <!-- 縦書きサイド情報パネル（IDを正しく紐付け） -->
-            <div id="side-panel" class="side-panel">
-                <div>手番:<span id="turn-indicator" style="font-weight:bold;">α</span></div>
-                <div>T:<span id="round-count">1</span>/30</div>
+            <!-- 縦書きでどちらからも見やすいサイド情報パネル -->
+            <div class="side-panel">
+                <div class="vertical-text">手番:<span id="turn-indicator" style="font-weight:bold;">α</span></div>
+                <div class="vertical-text">T:<span id="round-count">1</span>/30</div>
                 <div class="timer-box"><span id="timer">20</span>秒</div>
             </div>
 
@@ -699,4 +700,3 @@
 
 </body>
 </html>
-
