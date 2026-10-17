@@ -148,7 +148,7 @@
             border: 2px solid #444;
             transition: transform 0.3s ease;
         }
-        /* β側のときに盤面を180度回転させるクラス */
+        /* β側（オンライン対戦時など）の盤面回転 */
         #board-container.rotated {
             transform: rotate(180deg);
         }
@@ -161,13 +161,11 @@
             justify-content: center;
             color: #aaa;
         }
-        /* 盤面が回転した際、ヘッダーの文字も一緒に逆さまにならないように元に戻す */
-        #board-container.rotated .header-cell,
-        #board-container.rotated .piece,
-        #board-container.rotated .stack-container .piece {
-            /* 注意: 駒は元々beta側で180度回転しているため調整 */
+        /* 盤面回転時にヘッダーの文字を元に戻す */
+        #board-container.rotated .header-cell {
+            transform: rotate(180deg);
         }
-        
+
         .cell {
             background: #fff;
             position: relative;
@@ -182,6 +180,7 @@
         .cell.selected { background-color: #f9e79f !important; border: 2px solid #f1c40f; }
         .cell.movable { background-color: #a3e4d7 !important; }
 
+        /* 駒デザイン（通常時：1台対面用はβ側が180度回転） */
         .piece {
             width: 80%;
             height: 80%;
@@ -196,24 +195,16 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.3);
             z-index: 2;
         }
-        .piece.alpha { background-color: var(--color-alpha); border: 2px solid #145a32; }
-        .piece.beta { 
-            background-color: var(--color-beta); 
-            border: 2px solid #1b4f72; 
-            transform: rotate(180deg); 
-        }
+        .piece.alpha { background-color: var(--color-alpha); border: 2px solid #145a32; transform: rotate(0deg); }
+        .piece.beta { background-color: var(--color-beta); border: 2px solid #1b4f72; transform: rotate(180deg); }
         .piece.stunned { opacity: 0.5; filter: grayscale(50%); }
 
-        /* 盤面が回転している時のβ側・alpha側の駒の向き調整 */
+        /* オンライン対戦でβ側のスマホ（rotated）のときの駒の文字向き調整 */
         #board-container.rotated .piece.alpha {
-            transform: rotate(180deg);
+            transform: rotate(180deg); /* 盤面が回転しているためalphaの文字を反転 */
         }
         #board-container.rotated .piece.beta {
-            transform: rotate(0deg);
-        }
-        /* ヘッダーの文字も回転時に反転して見やすくする */
-        #board-container.rotated .header-cell {
-            transform: rotate(180deg);
+            transform: rotate(0deg);   /* 盤面が回転しているためbetaの文字を正位置にする */
         }
 
         .stack-container {
@@ -230,8 +221,8 @@
             height: 60%;
             font-size: 0.6rem;
         }
-        .stack-container .piece.alpha:nth-child(1) { transform: translate(-15%, -15%); }
-        .stack-container .piece.alpha:nth-child(2) { transform: translate(15%, 15%); }
+        .stack-container .piece.alpha:nth-child(1) { transform: translate(-15%, -15%) rotate(0deg); }
+        .stack-container .piece.alpha:nth-child(2) { transform: translate(15%, 15%) rotate(0deg); }
         .stack-container .piece.beta:nth-child(1) { transform: translate(-15%, -15%) rotate(180deg); }
         .stack-container .piece.beta:nth-child(2) { transform: translate(15%, 15%) rotate(180deg); }
 
@@ -349,7 +340,7 @@
                 <div class="timer-box"><span id="timer">20</span>秒</div>
             </div>
 
-            <!-- 盤面コンテナ（β側なら回転クラスが付く） -->
+            <!-- 盤面コンテナ -->
             <div id="board-container"></div>
         </div>
 
@@ -380,7 +371,6 @@
     let selectedCell = null;
     let gameOver = false;
 
-    // オンライン対戦用変数
     let isOnline = false;
     let peer = null;
     let conn = null;
@@ -494,7 +484,6 @@
                     document.getElementById('lobby-status').innerText = "部屋に参加しました！ゲーム開始！";
                     setTimeout(() => {
                         document.getElementById('mode-badge').innerText = "[オンライン: β側]";
-                        // β側のときは盤面を180度回転させる
                         document.getElementById('board-container').classList.add('rotated');
                         startGameCommon();
                     }, 1000);
