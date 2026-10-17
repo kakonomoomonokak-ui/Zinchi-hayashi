@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -145,7 +146,13 @@
             gap: 1px;
             background: #444;
             border: 2px solid #444;
+            transition: transform 0.3s ease;
         }
+        /* β側のときに盤面を180度回転させるクラス */
+        #board-container.rotated {
+            transform: rotate(180deg);
+        }
+
         .header-cell {
             background: #333;
             font-size: 0.55rem;
@@ -154,6 +161,13 @@
             justify-content: center;
             color: #aaa;
         }
+        /* 盤面が回転した際、ヘッダーの文字も一緒に逆さまにならないように元に戻す */
+        #board-container.rotated .header-cell,
+        #board-container.rotated .piece,
+        #board-container.rotated .stack-container .piece {
+            /* 注意: 駒は元々beta側で180度回転しているため調整 */
+        }
+        
         .cell {
             background: #fff;
             position: relative;
@@ -190,6 +204,18 @@
         }
         .piece.stunned { opacity: 0.5; filter: grayscale(50%); }
 
+        /* 盤面が回転している時のβ側・alpha側の駒の向き調整 */
+        #board-container.rotated .piece.alpha {
+            transform: rotate(180deg);
+        }
+        #board-container.rotated .piece.beta {
+            transform: rotate(0deg);
+        }
+        /* ヘッダーの文字も回転時に反転して見やすくする */
+        #board-container.rotated .header-cell {
+            transform: rotate(180deg);
+        }
+
         .stack-container {
             position: absolute;
             width: 100%;
@@ -208,6 +234,11 @@
         .stack-container .piece.alpha:nth-child(2) { transform: translate(15%, 15%); }
         .stack-container .piece.beta:nth-child(1) { transform: translate(-15%, -15%) rotate(180deg); }
         .stack-container .piece.beta:nth-child(2) { transform: translate(15%, 15%) rotate(180deg); }
+
+        #board-container.rotated .stack-container .piece.alpha:nth-child(1) { transform: translate(-15%, -15%) rotate(180deg); }
+        #board-container.rotated .stack-container .piece.alpha:nth-child(2) { transform: translate(15%, 15%) rotate(180deg); }
+        #board-container.rotated .stack-container .piece.beta:nth-child(1) { transform: translate(-15%, -15%) rotate(0deg); }
+        #board-container.rotated .stack-container .piece.beta:nth-child(2) { transform: translate(15%, 15%) rotate(0deg); }
 
         #controls {
             margin-top: 15px;
@@ -318,6 +349,7 @@
                 <div class="timer-box"><span id="timer">20</span>秒</div>
             </div>
 
+            <!-- 盤面コンテナ（β側なら回転クラスが付く） -->
             <div id="board-container"></div>
         </div>
 
@@ -352,7 +384,7 @@
     let isOnline = false;
     let peer = null;
     let conn = null;
-    let myRole = 'alpha'; // ホストがalpha、ゲストがbeta
+    let myRole = 'alpha';
 
     function switchScreen(screenId) {
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -416,10 +448,10 @@
         isOnline = false;
         myRole = 'alpha';
         document.getElementById('mode-badge').innerText = "[ローカル対戦]";
+        document.getElementById('board-container').classList.remove('rotated');
         startGameCommon();
     }
 
-    // --- PeerJS オンライン接続処理 ---
     function connectOnlineRoom() {
         const roomNum = document.getElementById('room-input').value.trim();
         if (roomNum.length !== 3) {
@@ -430,17 +462,11 @@
         isOnline = true;
         document.getElementById('lobby-status').innerText = "接続中...";
 
-        // 既存の接続があれば閉じる
         if (peer) peer.destroy();
-
-        // プレフィックスを付けてPeerIDを作成（重複防止）
         const hostId = "jintori-room-" + roomNum;
-        
-        // まず自分がホストとして部屋を作ってみる
         peer = new Peer(hostId);
 
         peer.on('open', (id) => {
-            // ホストとして部屋の作成に成功した場合
             myRole = 'alpha';
             document.getElementById('lobby-status').innerText = "部屋を作りました。相手の参加を待っています...";
             
@@ -450,16 +476,16 @@
                 document.getElementById('lobby-status').innerText = "相手が参加しました！ゲーム開始！";
                 setTimeout(() => {
                     document.getElementById('mode-badge').innerText = "[オンライン: α側]";
+                    document.getElementById('board-container').classList.remove('rotated');
                     startGameCommon();
                 }, 1000);
             });
         });
 
         peer.on('error', (err) => {
-            // すでに部屋が存在する場合はゲストとして参加を試みる
             if (err.type === 'unavailable-id') {
                 peer.destroy();
-                peer = new Peer(); // ランダムIDで接続用Peer作成
+                peer = new Peer();
 
                 peer.on('open', () => {
                     myRole = 'beta';
@@ -468,6 +494,8 @@
                     document.getElementById('lobby-status').innerText = "部屋に参加しました！ゲーム開始！";
                     setTimeout(() => {
                         document.getElementById('mode-badge').innerText = "[オンライン: β側]";
+                        // β側のときは盤面を180度回転させる
+                        document.getElementById('board-container').classList.add('rotated');
                         startGameCommon();
                     }, 1000);
                 });
@@ -627,8 +655,6 @@
 
     function onCellClick(coord) {
         if (gameOver) return;
-
-        // オンライン対戦時、自分の手番以外は操作禁止
         if (isOnline && currentTurn !== myRole) return;
 
         const cell = boardState[coord];
@@ -648,7 +674,6 @@
 
             const movable = getMovableCells(selectedCell);
             if (movable.includes(coord)) {
-                // オンライン対戦時は相手に通信送信
                 if (isOnline && conn) {
                     conn.send({ type: 'MOVE', from: selectedCell, to: coord });
                 }
@@ -751,7 +776,7 @@
 
             const rightBeyondIdx = beyondRIdx + rightDr;
             const rightBeyondC = beyondCNum + rightDc;
-            if (rightBeyondIdx >= 0 && rightBeyondIdx < ROWS.length && rightBeyondC >= 1 && rightBeyondC <= 9) {
+            if (rightBeyondIdx >= 0 && rightBeyondIdx < ROWS.length && rightBeyondC <= 9) {
                 clearIfEnemy(ROWS[rightBeyondIdx] + rightBeyondC);
             }
         }
@@ -894,4 +919,3 @@
 
 </body>
 </html>
-
