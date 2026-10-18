@@ -1,5 +1,3 @@
-
-
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -289,7 +287,7 @@
                 <li><b>共通移動</b>: すべての駒が全方向へ1マス移動可能。</li>
                 <li><b>王</b>: ターン終了時に前後のマスに陣地を作る（上書き不可）。剣士に倒されるとゲーム終了条件の一つになる。</li>
                 <li><b>剣士</b>: 敵の駒がいるマスに飛び込み、王以外の駒なら5ターン行動不能にして被さる（王は撃破可能）。</li>
-                <li><b>植林者</b>: 動いた元のマスに自分の陣地を作る。<b>自陣にいる植林者は、そのターン中に同じ駒を2回動かせる！</b></li>
+                <li><b>植林者</b>: 動いた元のマスに自分の陣地を作る。<b>ターン開始時にすでに自分の陣地にいる植林者は、そのターン中に同じ駒を2回動かせる！</b></li>
                 <li><b>伐採者</b>: 移動先、その左右、およびその奥にある相手の陣地を消去する。</li>
             </ul>
             <h3>⚔️ 特別ルール</h3>
@@ -336,7 +334,7 @@
 
 <script>
     const COLS = ['1','2','3','4','5','6','7','8','9'];
-    const ROWS = ['A','B','C','D','E','F','G','H','I'];
+    let ROWS = ['A','B','C','D','E','F','G','H','I'];
 
     let boardState = {};
     let currentTurn = 'alpha';
@@ -346,9 +344,9 @@
     let selectedCell = null;
     let gameOver = false;
 
-    // 植林者の2回行動管理用変数
-    let activePieceCoord = null; // 1回目に動かした植林者の座標（2回目も同じ駒を動かすため）
-    let lumberjackActionCount = 0; // そのターンでの移動回数 (0または1)
+    // 植林者の2回行動管理用
+    let activePieceDoubleMove = false; // 現在選択中の植林者が2回行動可能か
+    let hasMovedOnce = false;          // 1回目の移動が終わったか
 
     let isOnline = false;
     let peer = null;
@@ -487,8 +485,8 @@
         currentTurn = 'alpha';
         roundCount = 1;
         selectedCell = null;
-        lumberjackActionCount = 0;
-        activePieceCoord = null;
+        activePieceDoubleMove = false;
+        hasMovedOnce = false;
         document.getElementById('message').innerText = "";
         initBoard();
         switchScreen('game-screen');
@@ -626,25 +624,38 @@
 
         const cell = boardState[coord];
 
-        if (selectedCell === null) {
-            // 2回目の連続移動中の場合、直前に動かした植林者以外は選択できない
-            if (lumberjackActionCount === 1 && coord !== activePieceCoord) {
-                setMessage("同じ植林者をもう一度動かしてください。");
-                return;
+        // 2回行動の1回目が終わっているときは、選択中の同じ駒以外を選び直せない
+        if (hasMovedOnce) {
+            const movable = getMovableCells(selectedCell);
+            if (movable.includes(coord)) {
+                if (isOnline && conn) {
+                    conn.send({ type: 'MOVE', from: selectedCell, to: coord });
+                }
+                executeMove(selectedCell, coord);
             }
+            return;
+        }
 
+        if (selectedCell === null) {
             const hasMyActivePiece = cell.pieces.some(p => p.owner === currentTurn && p.stunnedTurns === 0);
             if (hasMyActivePiece) {
                 selectedCell = coord;
+                
+                // 【新ルール判定】選んだ駒が「植林者」かつ「ターン開始時に自分の陣地にいる」場合、2回行動フラグをON
+                const piece = cell.pieces.find(p => p.owner === currentTurn && p.stunnedTurns === 0);
+                if (piece && piece.type === '植林者0' || (piece && piece.type === '植林者' && cell.territory === currentTurn)) {
+                    activePieceDoubleMove = true;
+                } else {
+                    activePieceDoubleMove = false;
+                }
+
                 renderBoard();
             }
         } else {
             if (selectedCell === coord) {
-                // 1回目の選択時のみキャンセル可能（2回目は強制）
-                if (lumberjackActionCount === 0) {
-                    selectedCell = null;
-                    renderBoard();
-                }
+                selectedCell = null;
+                activePieceDoubleMove = false;
+                renderBoard();
                 return;
             }
 
@@ -655,15 +666,20 @@
                 }
                 executeMove(selectedCell, coord);
             } else {
-                if (lumberjackActionCount === 0) {
-                    const hasMyActivePiece = cell.pieces.some(p => p.owner === currentTurn && p.stunnedTurns === 0);
-                    if (hasMyActivePiece) {
-                        selectedCell = coord;
-                        renderBoard();
+                const hasMyActivePiece = cell.pieces.some(p => p.owner === currentTurn && p.stunnedTurns === 0);
+                if (hasMyActivePiece) {
+                    selectedCell = coord;
+                    const piece = cell.pieces.find(p => p.owner === currentTurn && p.stunnedTurns === 0);
+                    if (piece && piece.type === '植林者' && cell.territory === currentTurn) {
+                        activePieceDoubleMove = true;
                     } else {
-                        selectedCell = null;
-                        renderBoard();
+                        activePieceDoubleMove = false;
                     }
+                    renderBoard();
+                } else {
+                    selectedCell = null;
+                    activePieceDoubleMove = false;
+                    renderBoard();
                 }
             }
         }
@@ -704,21 +720,19 @@
             processKingTerritory(to);
         }
 
-        // --- 植林者の2回行動判定 ---
-        // 1回目で動かした駒が「植林者」であり、かつ「移動する直前のマス（fromCell）」が自陣（自分のチームの陣地）だった場合
-        if (movingPiece.type === '植林者' && fromCell.territory === currentTurn && lumberjackActionCount === 0) {
-            lumberjackActionCount = 1;
-            activePieceCoord = to; // 移動先の座標を次の選択肢として固定
-            selectedCell = to;
-            setMessage("植林者：自陣にいたため、同じ駒をもう一度動かせます！");
+        // 【新ルール適用】植林者がターン開始時に自陣にいて、1回目の移動が終わった場合、もう一度同じ駒を動かせる
+        if (movingPiece.type === '植林者' && activePieceDoubleMove && !hasMovedOnce) {
+            hasMovedOnce = true;
+            selectedCell = to; // 移動先のマスを選択状態にして維持
+            setMessage("植林者：2回目の移動が可能です！");
             resetTimer();
             renderBoard();
             return;
         }
 
         // ターン終了処理
-        lumberjackActionCount = 0;
-        activePieceCoord = null;
+        activePieceDoubleMove = false;
+        hasMovedOnce = false;
         selectedCell = null;
         nextTurn();
     }
@@ -792,8 +806,9 @@
     }
 
     function nextTurn() {
-        lumberjackActionCount = 0;
-        activePieceCoord = null;
+        activePieceDoubleMove = false;
+        hasMovedOnce = false;
+
         for (let r of ROWS) {
             for (let c of COLS) {
                 const cell = boardState[r + c];
@@ -840,8 +855,8 @@
 
         setMessage("パスしました。");
         selectedCell = null;
-        lumberjackActionCount = 0;
-        activePieceCoord = null;
+        activePieceDoubleMove = false;
+        hasMovedOnce = false;
         nextTurn();
     }
 
@@ -909,8 +924,8 @@
         }
         if(isRemote || confirm("ゲームをリセットしてタイトルに戻りますか？")) {
             clearInterval(timerInterval);
-            lumberjackActionCount = 0;
-            activePieceCoord = null;
+            activePieceDoubleMove = false;
+            hasMovedOnce = false;
             switchScreen('start-screen');
         }
     }
@@ -918,3 +933,4 @@
 
 </body>
 </html>
+
