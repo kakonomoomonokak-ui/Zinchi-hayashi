@@ -146,7 +146,24 @@
             gap: 1px;
             background: #444;
             border: 2px solid #444;
+            transition: transform 0.3s ease;
         }
+
+        /* 
+          【β側専用の完全反転スタイル】
+          盤面自体を180度回転させ、中身の文字やヘッダーもすべて180度反転させて正位置に保つ
+        */
+        #board-container.rotated {
+            transform: rotate(180deg);
+        }
+        #board-container.rotated .header-cell,
+        #board-container.rotated .piece {
+            transform: rotate(180deg);
+        }
+        #board-container.rotated .stack-container .piece {
+            transform: translate(-50%, -50%) rotate(180deg);
+        }
+
         .header-cell {
             background: #333;
             font-size: 0.55rem;
@@ -184,7 +201,7 @@
             z-index: 2;
         }
         .piece.alpha { background-color: var(--color-alpha); border: 2px solid #145a32; }
-        .piece.beta { background-color: var(--color-beta); border: 2px solid #1b4f72; transform: rotate(180deg); }
+        .piece.beta { background-color: var(--color-beta); border: 2px solid #1b4f72; }
         .piece.stunned { opacity: 0.5; filter: grayscale(50%); }
 
         .stack-container {
@@ -203,8 +220,8 @@
         }
         .stack-container .piece.alpha:nth-child(1) { transform: translate(-15%, -15%); }
         .stack-container .piece.alpha:nth-child(2) { transform: translate(15%, 15%); }
-        .stack-container .piece.beta:nth-child(1) { transform: translate(-15%, -15%) rotate(180deg); }
-        .stack-container .piece.beta:nth-child(2) { transform: translate(15%, 15%) rotate(180deg); }
+        .stack-container .piece.beta:nth-child(1) { transform: translate(-15%, -15%); }
+        .stack-container .piece.beta:nth-child(2) { transform: translate(15%, 15%); }
 
         #controls {
             margin-top: 15px;
@@ -288,7 +305,7 @@
                 <li><b>共通移動</b>: すべての駒が全方向へ1マス移動可能。</li>
                 <li><b>王</b>: ターン終了時に前後のマスに陣地を作る（上書き不可、相手の陣地には置けない）。剣士に倒されるとゲーム終了条件の一つになる。</li>
                 <li><b>剣士</b>: 敵の駒がいるマスに飛び込み、王以外の駒なら5ターン行動不能にして被さる（王は撃破可能）。</li>
-                <li><b>植林者</b>: 動いた元のマスが自分の陣地または中立なら自分の陣地にする（相手の陣地には置けない）。<b>ターン開始時にすでに自分の陣地にいる植林者は、そのターン中に同じ駒を3回動かせる！</b></li>
+                <li><b>植林者</b>: 動いた元のマスが自分の陣地または中立なら自分の陣地にする（相手の陣地には置けない）。ターン開始時にすでに自分の陣地にいる植林者は、そのターン中に同じ駒を3回動かせる！</li>
                 <li><b>伐採者</b>: 移動先、その左右、およびその奥にある相手の陣地を消去する。</li>
             </ul>
             <h3>⚔️ 特別ルール</h3>
@@ -345,9 +362,8 @@
     let selectedCell = null;
     let gameOver = false;
 
-    // 植林者の3回行動管理用
     let activePieceDoubleMove = false; 
-    let moveCount = 0; // 何回移動したか (0, 1, 2)
+    let moveCount = 0; 
 
     let isOnline = false;
     let peer = null;
@@ -416,6 +432,7 @@
         isOnline = false;
         myRole = 'alpha';
         document.getElementById('mode-badge').innerText = "[ローカル対戦]";
+        document.getElementById('board-container').classList.remove('rotated');
         startGameCommon();
     }
 
@@ -443,6 +460,7 @@
                 document.getElementById('lobby-status').innerText = "相手が参加しました！ゲーム開始！";
                 setTimeout(() => {
                     document.getElementById('mode-badge').innerText = "[オンライン: α側]";
+                    document.getElementById('board-container').classList.remove('rotated');
                     startGameCommon();
                 }, 1000);
             });
@@ -460,6 +478,7 @@
                     document.getElementById('lobby-status').innerText = "部屋に参加しました！ゲーム開始！";
                     setTimeout(() => {
                         document.getElementById('mode-badge').innerText = "[オンライン: β側]";
+                        document.getElementById('board-container').classList.add('rotated');
                         startGameCommon();
                     }, 1000);
                 });
@@ -625,7 +644,6 @@
 
         const cell = boardState[coord];
 
-        // 1回目・2回目の移動が終わっている時は、選択中の同じ植林者以外クリックさせない
         if (moveCount > 0) {
             if (coord === selectedCell) {
                 selectedCell = null;
@@ -731,7 +749,6 @@
             processKingTerritory(to);
         }
 
-        // 【新ルール】植林者が最初から自陣にいて、移動回数が3回未満（1回目または2回目）なら連続行動
         if (movingPiece.type === '植林者' && activePieceDoubleMove && moveCount < 2) {
             moveCount++;
             selectedCell = to; 
