@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -287,7 +288,7 @@
                 <li><b>共通移動</b>: すべての駒が全方向へ1マス移動可能。</li>
                 <li><b>王</b>: ターン終了時に前後のマスに陣地を作る（上書き不可、相手の陣地には置けない）。剣士に倒されるとゲーム終了条件の一つになる。</li>
                 <li><b>剣士</b>: 敵の駒がいるマスに飛び込み、王以外の駒なら5ターン行動不能にして被さる（王は撃破可能）。</li>
-                <li><b>植林者</b>: 動いた元のマスが自分の陣地または中立なら自分の陣地にする（相手の陣地には置けない）。ターン開始時にすでに自分の陣地にいる植林者は、そのターン中に同じ駒を2回動かせる！</li>
+                <li><b>植林者</b>: 動いた元のマスが自分の陣地または中立なら自分の陣地にする（相手の陣地には置けない）。<b>ターン開始時にすでに自分の陣地にいる植林者は、そのターン中に同じ駒を3回動かせる！</b></li>
                 <li><b>伐採者</b>: 移動先、その左右、およびその奥にある相手の陣地を消去する。</li>
             </ul>
             <h3>⚔️ 特別ルール</h3>
@@ -344,8 +345,9 @@
     let selectedCell = null;
     let gameOver = false;
 
+    // 植林者の3回行動管理用
     let activePieceDoubleMove = false; 
-    let hasMovedOnce = false;          
+    let moveCount = 0; // 何回移動したか (0, 1, 2)
 
     let isOnline = false;
     let peer = null;
@@ -485,7 +487,7 @@
         roundCount = 1;
         selectedCell = null;
         activePieceDoubleMove = false;
-        hasMovedOnce = false;
+        moveCount = 0;
         document.getElementById('message').innerText = "";
         initBoard();
         switchScreen('game-screen');
@@ -623,11 +625,12 @@
 
         const cell = boardState[coord];
 
-        if (hasMovedOnce) {
+        // 1回目・2回目の移動が終わっている時は、選択中の同じ植林者以外クリックさせない
+        if (moveCount > 0) {
             if (coord === selectedCell) {
                 selectedCell = null;
                 activePieceDoubleMove = false;
-                hasMovedOnce = false;
+                moveCount = 0;
                 renderBoard();
                 return;
             }
@@ -699,7 +702,6 @@
 
         const enemyTerritory = (currentTurn === 'alpha' ? 'beta' : 'alpha');
 
-        // 【新ルール】植林者が動いた元マスが相手の陣地でなければ、自分の陣地にする
         if (movingPiece.type === '植林者') {
             if (fromCell.territory !== enemyTerritory) {
                 fromCell.territory = currentTurn;
@@ -725,22 +727,22 @@
 
         toCell.pieces.push(movingPiece);
 
-        // 【新ルール】王が陣地を広げる際、相手の陣地があるマスは上書き（変更）しない
         if (movingPiece.type === '王') {
             processKingTerritory(to);
         }
 
-        if (movingPiece.type === '植林者' && activePieceDoubleMove && !hasMovedOnce) {
-            hasMovedOnce = true;
+        // 【新ルール】植林者が最初から自陣にいて、移動回数が3回未満（1回目または2回目）なら連続行動
+        if (movingPiece.type === '植林者' && activePieceDoubleMove && moveCount < 2) {
+            moveCount++;
             selectedCell = to; 
-            setMessage("植林者：2回目の移動が可能です！");
+            setMessage(`植林者：あと ${3 - moveCount} 回動けます！`);
             resetTimer();
             renderBoard();
             return;
         }
 
         activePieceDoubleMove = false;
-        hasMovedOnce = false;
+        moveCount = 0;
         selectedCell = null;
         nextTurn();
     }
@@ -809,7 +811,6 @@
         const enemyTerritory = (currentTurn === 'alpha' ? 'beta' : 'alpha');
 
         for (let t of targets) {
-            // 王が前後のマスを陣地にする時、相手の陣地でなければ自分の陣地にする
             if (boardState[t] && boardState[t].territory !== enemyTerritory) {
                 boardState[t].territory = currentTurn;
             }
@@ -818,7 +819,7 @@
 
     function nextTurn() {
         activePieceDoubleMove = false;
-        hasMovedOnce = false;
+        moveCount = 0;
 
         for (let r of ROWS) {
             for (let c of COLS) {
@@ -867,7 +868,7 @@
         setMessage("パスしました。");
         selectedCell = null;
         activePieceDoubleMove = false;
-        hasMovedOnce = false;
+        moveCount = 0;
         nextTurn();
     }
 
@@ -936,7 +937,7 @@
         if(isRemote || confirm("ゲームをリセットしてタイトルに戻りますか？")) {
             clearInterval(timerInterval);
             activePieceDoubleMove = false;
-            hasMovedOnce = false;
+            moveCount = 0;
             switchScreen('start-screen');
         }
     }
