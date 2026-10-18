@@ -301,7 +301,7 @@
                 <li><b>共通移動</b>: すべての駒が全方向へ1マス移動可能。</li>
                 <li><b>王</b>: ターン終了時に前後のマスに陣地を作る（上書き不可、相手の陣地には置けない）。剣士に倒されるとゲーム終了条件の一つになる。</li>
                 <li><b>剣士</b>: 敵の駒がいるマスに飛び込み、王以外の駒なら5ターン行動不能にして被さる（王は撃破可能）。</li>
-                <li><b>植林者</b>: 動いた元のマスが自分の陣地または中立なら自分の陣地にする（相手の陣地には置けない）。ターン開始時にすでに自分の陣地にいる植林者は、そのターン中に同じ駒を3回動かせる！</li>
+                <li><b>植林者</b>: 動いた元のマスを自分の陣地にする（相手陣地は不可）。<b>さらに、ターン開始時に自分の陣地にいる場合、動いたあとの場所とその左右それぞれ1マスの計3マスを自分の陣地にする（相手陣地は上書き不可）。</b></li>
                 <li><b>伐採者</b>: 移動先、その左右、およびその奥にある相手の陣地を消去する。</li>
             </ul>
             <h3>⚔️ 特別ルール</h3>
@@ -357,9 +357,6 @@
     let timerInterval = null;
     let selectedCell = null;
     let gameOver = false;
-
-    let activePieceDoubleMove = false; 
-    let moveCount = 0; 
 
     let isOnline = false;
     let peer = null;
@@ -501,8 +498,6 @@
         currentTurn = 'alpha';
         roundCount = 1;
         selectedCell = null;
-        activePieceDoubleMove = false;
-        moveCount = 0;
         document.getElementById('message').innerText = "";
         initBoard();
         switchScreen('game-screen');
@@ -640,42 +635,15 @@
 
         const cell = boardState[coord];
 
-        if (moveCount > 0) {
-            if (coord === selectedCell) {
-                selectedCell = null;
-                activePieceDoubleMove = false;
-                moveCount = 0;
-                renderBoard();
-                return;
-            }
-            const movable = getMovableCells(selectedCell);
-            if (movable.includes(coord)) {
-                if (isOnline && conn) {
-                    conn.send({ type: 'MOVE', from: selectedCell, to: coord });
-                }
-                executeMove(selectedCell, coord);
-            }
-            return;
-        }
-
         if (selectedCell === null) {
             const hasMyActivePiece = cell.pieces.some(p => p.owner === currentTurn && p.stunnedTurns === 0);
             if (hasMyActivePiece) {
                 selectedCell = coord;
-                
-                const piece = cell.pieces.find(p => p.owner === currentTurn && p.stunnedTurns === 0);
-                if (piece && piece.type === '植林者' && cell.territory === currentTurn) {
-                    activePieceDoubleMove = true;
-                } else {
-                    activePieceDoubleMove = false;
-                }
-
                 renderBoard();
             }
         } else {
             if (selectedCell === coord) {
                 selectedCell = null;
-                activePieceDoubleMove = false;
                 renderBoard();
                 return;
             }
@@ -690,16 +658,9 @@
                 const hasMyActivePiece = cell.pieces.some(p => p.owner === currentTurn && p.stunnedTurns === 0);
                 if (hasMyActivePiece) {
                     selectedCell = coord;
-                    const piece = cell.pieces.find(p => p.owner === currentTurn && p.stunnedTurns === 0);
-                    if (piece && piece.type === '植林者' && cell.territory === currentTurn) {
-                        activePieceDoubleMove = true;
-                    } else {
-                        activePieceDoubleMove = false;
-                    }
                     renderBoard();
                 } else {
                     selectedCell = null;
-                    activePieceDoubleMove = false;
                     renderBoard();
                 }
             }
@@ -715,6 +676,9 @@
         const movingPiece = fromCell.pieces.splice(pieceIdx, 1)[0];
 
         const enemyTerritory = (currentTurn === 'alpha' ? 'beta' : 'alpha');
+
+        // 植林者の特殊判定：行動前に自陣にいたかどうかをチェック
+        const wasInTerritory = (fromCell.territory === currentTurn);
 
         if (movingPiece.type === '植林者') {
             if (fromCell.territory !== enemyTerritory) {
@@ -745,23 +709,51 @@
             processKingTerritory(to);
         }
 
-        // 植林者の3回連続移動の判定（通信時も連続行動中はターンを切り替えない）
-        if (movingPiece.type === '植林者' && activePieceDoubleMove && moveCount < 2) {
-            moveCount++;
-            selectedCell = to; 
-            setMessage(`植林者：あと ${3 - moveCount} 回動けます！`);
-            resetTimer();
-            renderBoard();
-            return;
+        // 【新性能】植林者が行動前に自陣にいた場合、動いた場所とその左右それぞれ1マスを陣地にする
+        if (movingPiece.type === '植林者' && wasInTerritory) {
+            processPlanterTripleTerritory(from, to);
         }
 
-        // 3回目の移動完了、または通常の駒の移動完了
-        activePieceDoubleMove = false;
-        moveCount = 0;
         selectedCell = null;
-        
-        // ターン切り替えとタイマーリセットを確実に実行
         nextTurn();
+    }
+
+    // 植林者が自陣スタート時の3マス陣地化処理
+    function processPlanterTripleTerritory(from, to) {
+        const r1 = from[0], c1 = parseInt(from[1]);
+        const r2 = to[0], c2 = parseInt(to[1]);
+        const dr = ROWS.indexOf(r2) - ROWS.indexOf(r1);
+        const dc = c2 - c1;
+
+        const enemyTerritory = (currentTurn === 'alpha' ? 'beta' : 'alpha');
+
+        const setTerritoryIfValid = (coord) => {
+            if (boardState[coord] && boardState[coord].territory !== enemyTerritory) {
+                boardState[coord].territory = currentTurn;
+            }
+        };
+
+        // 動いた先のマス
+        setTerritoryIfValid(to);
+
+        const r2Idx = ROWS.indexOf(r2);
+        // 左右の方向ベクトルを計算
+        const leftDr = -dc, leftDc = dr;
+        const rightDr = dc, rightDc = -dr;
+
+        // 左のマス
+        const leftIdx = r2Idx + leftDr;
+        const leftC = c2 + leftDc;
+        if (leftIdx >= 0 && leftIdx < ROWS.length && leftC >= 1 && leftC <= 9) {
+            setTerritoryIfValid(ROWS[leftIdx] + leftC);
+        }
+
+        // 右のマス
+        const rightIdx = r2Idx + rightDr;
+        const rightC = c2 + rightDc;
+        if (rightIdx >= 0 && rightIdx < ROWS.length && rightC <= 9) {
+            setTerritoryIfValid(ROWS[rightIdx] + rightC);
+        }
     }
 
     function processLumberjack(from, to) {
@@ -835,9 +827,6 @@
     }
 
     function nextTurn() {
-        activePieceDoubleMove = false;
-        moveCount = 0;
-
         for (let r of ROWS) {
             for (let c of COLS) {
                 const cell = boardState[r + c];
@@ -884,8 +873,6 @@
 
         setMessage("パスしました。");
         selectedCell = null;
-        activePieceDoubleMove = false;
-        moveCount = 0;
         nextTurn();
     }
 
@@ -953,8 +940,6 @@
         }
         if(isRemote || confirm("ゲームをリセットしてタイトルに戻りますか？")) {
             clearInterval(timerInterval);
-            activePieceDoubleMove = false;
-            moveCount = 0;
             switchScreen('start-screen');
         }
     }
