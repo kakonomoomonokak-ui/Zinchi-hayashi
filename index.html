@@ -1,3 +1,5 @@
+
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -287,7 +289,7 @@
                 <li><b>共通移動</b>: すべての駒が全方向へ1マス移動可能。</li>
                 <li><b>王</b>: ターン終了時に前後のマスに陣地を作る（上書き不可）。剣士に倒されるとゲーム終了条件の一つになる。</li>
                 <li><b>剣士</b>: 敵の駒がいるマスに飛び込み、王以外の駒なら5ターン行動不能にして被さる（王は撃破可能）。</li>
-                <li><b>植林者</b>: 動いた元のマスに自分の陣地を作る。<b>さらに、自分の陣地にいる時は1ターンに2回動ける！</b></li>
+                <li><b>植林者</b>: 動いた元のマスに自分の陣地を作る。<b>自陣にいる植林者は、そのターン中に同じ駒を2回動かせる！</b></li>
                 <li><b>伐採者</b>: 移動先、その左右、およびその奥にある相手の陣地を消去する。</li>
             </ul>
             <h3>⚔️ 特別ルール</h3>
@@ -344,8 +346,9 @@
     let selectedCell = null;
     let gameOver = false;
 
-    // 植林者の2回行動用変数
-    let lumberjackActionCount = 0; // 今回のターンでの移動回数
+    // 植林者の2回行動管理用変数
+    let activePieceCoord = null; // 1回目に動かした植林者の座標（2回目も同じ駒を動かすため）
+    let lumberjackActionCount = 0; // そのターンでの移動回数 (0または1)
 
     let isOnline = false;
     let peer = null;
@@ -485,6 +488,7 @@
         roundCount = 1;
         selectedCell = null;
         lumberjackActionCount = 0;
+        activePieceCoord = null;
         document.getElementById('message').innerText = "";
         initBoard();
         switchScreen('game-screen');
@@ -623,6 +627,12 @@
         const cell = boardState[coord];
 
         if (selectedCell === null) {
+            // 2回目の連続移動中の場合、直前に動かした植林者以外は選択できない
+            if (lumberjackActionCount === 1 && coord !== activePieceCoord) {
+                setMessage("同じ植林者をもう一度動かしてください。");
+                return;
+            }
+
             const hasMyActivePiece = cell.pieces.some(p => p.owner === currentTurn && p.stunnedTurns === 0);
             if (hasMyActivePiece) {
                 selectedCell = coord;
@@ -630,8 +640,11 @@
             }
         } else {
             if (selectedCell === coord) {
-                selectedCell = null;
-                renderBoard();
+                // 1回目の選択時のみキャンセル可能（2回目は強制）
+                if (lumberjackActionCount === 0) {
+                    selectedCell = null;
+                    renderBoard();
+                }
                 return;
             }
 
@@ -642,13 +655,15 @@
                 }
                 executeMove(selectedCell, coord);
             } else {
-                const hasMyActivePiece = cell.pieces.some(p => p.owner === currentTurn && p.stunnedTurns === 0);
-                if (hasMyActivePiece) {
-                    selectedCell = coord;
-                    renderBoard();
-                } else {
-                    selectedCell = null;
-                    renderBoard();
+                if (lumberjackActionCount === 0) {
+                    const hasMyActivePiece = cell.pieces.some(p => p.owner === currentTurn && p.stunnedTurns === 0);
+                    if (hasMyActivePiece) {
+                        selectedCell = coord;
+                        renderBoard();
+                    } else {
+                        selectedCell = null;
+                        renderBoard();
+                    }
                 }
             }
         }
@@ -689,17 +704,21 @@
             processKingTerritory(to);
         }
 
-        // 植林者が自陣（自分の陣地）にいて、かつまだ1回目の移動だった場合、もう一度動ける！
-        if (movingPiece.type === '植林者' && toCell.territory === currentTurn && lumberjackActionCount === 0) {
+        // --- 植林者の2回行動判定 ---
+        // 1回目で動かした駒が「植林者」であり、かつ「移動する直前のマス（fromCell）」が自陣（自分のチームの陣地）だった場合
+        if (movingPiece.type === '植林者' && fromCell.territory === currentTurn && lumberjackActionCount === 0) {
             lumberjackActionCount = 1;
-            selectedCell = to; // 移動先のマスを選択状態にして継続
-            setMessage("植林者：自陣にいるため、もう一度動けます！");
+            activePieceCoord = to; // 移動先の座標を次の選択肢として固定
+            selectedCell = to;
+            setMessage("植林者：自陣にいたため、同じ駒をもう一度動かせます！");
             resetTimer();
             renderBoard();
             return;
         }
 
+        // ターン終了処理
         lumberjackActionCount = 0;
+        activePieceCoord = null;
         selectedCell = null;
         nextTurn();
     }
@@ -774,6 +793,7 @@
 
     function nextTurn() {
         lumberjackActionCount = 0;
+        activePieceCoord = null;
         for (let r of ROWS) {
             for (let c of COLS) {
                 const cell = boardState[r + c];
@@ -821,6 +841,7 @@
         setMessage("パスしました。");
         selectedCell = null;
         lumberjackActionCount = 0;
+        activePieceCoord = null;
         nextTurn();
     }
 
@@ -889,6 +910,7 @@
         if(isRemote || confirm("ゲームをリセットしてタイトルに戻りますか？")) {
             clearInterval(timerInterval);
             lumberjackActionCount = 0;
+            activePieceCoord = null;
             switchScreen('start-screen');
         }
     }
@@ -896,4 +918,3 @@
 
 </body>
 </html>
-
