@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -146,13 +145,7 @@
             gap: 1px;
             background: #444;
             border: 2px solid #444;
-            transition: transform 0.3s ease;
         }
-        /* β側の時は盤面を180度回転させる */
-        #board-container.rotated {
-            transform: rotate(180deg);
-        }
-
         .header-cell {
             background: #333;
             font-size: 0.55rem;
@@ -161,10 +154,6 @@
             justify-content: center;
             color: #aaa;
         }
-        #board-container.rotated .header-cell {
-            transform: rotate(180deg);
-        }
-
         .cell {
             background: #fff;
             position: relative;
@@ -193,27 +182,9 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.3);
             z-index: 2;
         }
-
-        /* 
-          【基本（α側視点）】
-          - αの駒（自分の駒）：まっすぐ正しく読める (0deg)
-          - βの駒（相手の駒）：逆さまに見える (180deg)
-        */
-        .piece.alpha { background-color: var(--color-alpha); border: 2px solid #145a32; transform: rotate(0deg); }
-        .piece.beta  { background-color: var(--color-beta);  border: 2px solid #1b4f72; transform: rotate(180deg); }
+        .piece.alpha { background-color: var(--color-alpha); border: 2px solid #145a32; }
+        .piece.beta { background-color: var(--color-beta); border: 2px solid #1b4f72; transform: rotate(180deg); }
         .piece.stunned { opacity: 0.5; filter: grayscale(50%); }
-
-        /* 
-          【β側視点（rotated / 盤面が180度回転している状態）】
-          - 盤面が回転しているため、α側の文字（相手）をさらに180度回して「逆さま」にする (180deg)
-          - β側の文字（自分）を180度回して「まっすぐ正しく読める」ようにする (0deg)
-        */
-        #board-container.rotated .piece.alpha {
-            transform: rotate(180deg); 
-        }
-        #board-container.rotated .piece.beta {
-            transform: rotate(0deg);   
-        }
 
         .stack-container {
             position: absolute;
@@ -229,15 +200,10 @@
             height: 60%;
             font-size: 0.6rem;
         }
-        .stack-container .piece.alpha:nth-child(1) { transform: translate(-15%, -15%) rotate(0deg); }
-        .stack-container .piece.alpha:nth-child(2) { transform: translate(15%, 15%) rotate(0deg); }
+        .stack-container .piece.alpha:nth-child(1) { transform: translate(-15%, -15%); }
+        .stack-container .piece.alpha:nth-child(2) { transform: translate(15%, 15%); }
         .stack-container .piece.beta:nth-child(1) { transform: translate(-15%, -15%) rotate(180deg); }
         .stack-container .piece.beta:nth-child(2) { transform: translate(15%, 15%) rotate(180deg); }
-
-        #board-container.rotated .stack-container .piece.alpha:nth-child(1) { transform: translate(-15%, -15%) rotate(180deg); }
-        #board-container.rotated .stack-container .piece.alpha:nth-child(2) { transform: translate(15%, 15%) rotate(180deg); }
-        #board-container.rotated .stack-container .piece.beta:nth-child(1) { transform: translate(-15%, -15%) rotate(0deg); }
-        #board-container.rotated .stack-container .piece.beta:nth-child(2) { transform: translate(15%, 15%) rotate(0deg); }
 
         #controls {
             margin-top: 15px;
@@ -321,7 +287,7 @@
                 <li><b>共通移動</b>: すべての駒が全方向へ1マス移動可能。</li>
                 <li><b>王</b>: ターン終了時に前後のマスに陣地を作る（上書き不可）。剣士に倒されるとゲーム終了条件の一つになる。</li>
                 <li><b>剣士</b>: 敵の駒がいるマスに飛び込み、王以外の駒なら5ターン行動不能にして被さる（王は撃破可能）。</li>
-                <li><b>植林者</b>: 動いた元のマスに自分の陣地を作る。</li>
+                <li><b>植林者</b>: 動いた元のマスに自分の陣地を作る。<b>さらに、自分の陣地にいる時は1ターンに2回動ける！</b></li>
                 <li><b>伐採者</b>: 移動先、その左右、およびその奥にある相手の陣地を消去する。</li>
             </ul>
             <h3>⚔️ 特別ルール</h3>
@@ -377,6 +343,9 @@
     let timerInterval = null;
     let selectedCell = null;
     let gameOver = false;
+
+    // 植林者の2回行動用変数
+    let lumberjackActionCount = 0; // 今回のターンでの移動回数
 
     let isOnline = false;
     let peer = null;
@@ -445,7 +414,6 @@
         isOnline = false;
         myRole = 'alpha';
         document.getElementById('mode-badge').innerText = "[ローカル対戦]";
-        document.getElementById('board-container').classList.remove('rotated');
         startGameCommon();
     }
 
@@ -473,7 +441,6 @@
                 document.getElementById('lobby-status').innerText = "相手が参加しました！ゲーム開始！";
                 setTimeout(() => {
                     document.getElementById('mode-badge').innerText = "[オンライン: α側]";
-                    document.getElementById('board-container').classList.remove('rotated');
                     startGameCommon();
                 }, 1000);
             });
@@ -491,7 +458,6 @@
                     document.getElementById('lobby-status').innerText = "部屋に参加しました！ゲーム開始！";
                     setTimeout(() => {
                         document.getElementById('mode-badge').innerText = "[オンライン: β側]";
-                        document.getElementById('board-container').classList.add('rotated');
                         startGameCommon();
                     }, 1000);
                 });
@@ -518,6 +484,7 @@
         currentTurn = 'alpha';
         roundCount = 1;
         selectedCell = null;
+        lumberjackActionCount = 0;
         document.getElementById('message').innerText = "";
         initBoard();
         switchScreen('game-screen');
@@ -722,6 +689,17 @@
             processKingTerritory(to);
         }
 
+        // 植林者が自陣（自分の陣地）にいて、かつまだ1回目の移動だった場合、もう一度動ける！
+        if (movingPiece.type === '植林者' && toCell.territory === currentTurn && lumberjackActionCount === 0) {
+            lumberjackActionCount = 1;
+            selectedCell = to; // 移動先のマスを選択状態にして継続
+            setMessage("植林者：自陣にいるため、もう一度動けます！");
+            resetTimer();
+            renderBoard();
+            return;
+        }
+
+        lumberjackActionCount = 0;
         selectedCell = null;
         nextTurn();
     }
@@ -795,6 +773,7 @@
     }
 
     function nextTurn() {
+        lumberjackActionCount = 0;
         for (let r of ROWS) {
             for (let c of COLS) {
                 const cell = boardState[r + c];
@@ -841,6 +820,7 @@
 
         setMessage("パスしました。");
         selectedCell = null;
+        lumberjackActionCount = 0;
         nextTurn();
     }
 
@@ -908,6 +888,7 @@
         }
         if(isRemote || confirm("ゲームをリセットしてタイトルに戻りますか？")) {
             clearInterval(timerInterval);
+            lumberjackActionCount = 0;
             switchScreen('start-screen');
         }
     }
@@ -915,3 +896,4 @@
 
 </body>
 </html>
+
