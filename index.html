@@ -744,19 +744,17 @@
             processKingTerritory(to);
         }
 
-        // 植林者の連続行動（3回未満の移動）
+        // 植林者が3回行動の条件を満たしており、まだ3回未満の移動の場合
         if (movingPiece.type === '植林者' && activePieceDoubleMove && moveCount < 2) {
             moveCount++;
             selectedCell = to; 
             setMessage(`植林者：あと ${3 - moveCount} 回動けます！`);
             resetTimer();
             renderBoard();
-            
-            // リモート側（相手側）でも同じ状態を維持できるように同期
             return;
         }
 
-        // ターン終了処理（確実にリセット）
+        // 3回目の移動完了、または通常の駒の移動が完了した場合
         activePieceDoubleMove = false;
         moveCount = 0;
         selectedCell = null;
@@ -836,7 +834,6 @@
     function nextTurn() {
         activePieceDoubleMove = false;
         moveCount = 0;
-        selectedCell = null;
 
         for (let r of ROWS) {
             for (let c of COLS) {
@@ -883,9 +880,9 @@
         }
 
         setMessage("パスしました。");
+        selectedCell = null;
         activePieceDoubleMove = false;
         moveCount = 0;
-        selectedCell = null;
         nextTurn();
     }
 
@@ -955,7 +952,6 @@
             clearInterval(timerInterval);
             activePieceDoubleMove = false;
             moveCount = 0;
-            selectedCell = null;
             switchScreen('start-screen');
         }
     }
@@ -963,3 +959,4 @@
 
 </body>
 </html>
+
