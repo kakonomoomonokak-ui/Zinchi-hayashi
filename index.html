@@ -334,7 +334,7 @@
 
 <script>
     const COLS = ['1','2','3','4','5','6','7','8','9'];
-    let ROWS = ['A','B','C','D','E','F','G','H','I'];
+    const ROWS = ['A','B','C','D','E','F','G','H','I'];
 
     let boardState = {};
     let currentTurn = 'alpha';
@@ -345,8 +345,8 @@
     let gameOver = false;
 
     // 植林者の2回行動管理用
-    let activePieceDoubleMove = false; // 現在選択中の植林者が2回行動可能か
-    let hasMovedOnce = false;          // 1回目の移動が終わったか
+    let activePieceDoubleMove = false; 
+    let hasMovedOnce = false;          
 
     let isOnline = false;
     let peer = null;
@@ -624,8 +624,15 @@
 
         const cell = boardState[coord];
 
-        // 2回行動の1回目が終わっているときは、選択中の同じ駒以外を選び直せない
+        // 1回目の移動が終わっている時は、選択中の同じ植林者以外クリックさせない
         if (hasMovedOnce) {
+            if (coord === selectedCell) {
+                selectedCell = null;
+                activePieceDoubleMove = false;
+                hasMovedOnce = false;
+                renderBoard();
+                return;
+            }
             const movable = getMovableCells(selectedCell);
             if (movable.includes(coord)) {
                 if (isOnline && conn) {
@@ -641,9 +648,9 @@
             if (hasMyActivePiece) {
                 selectedCell = coord;
                 
-                // 【新ルール判定】選んだ駒が「植林者」かつ「ターン開始時に自分の陣地にいる」場合、2回行動フラグをON
+                // 【厳密な判定】ターン開始時点（クリックした瞬間）に、そのマスが自分の陣地である場合のみ2回行動を許可
                 const piece = cell.pieces.find(p => p.owner === currentTurn && p.stunnedTurns === 0);
-                if (piece && piece.type === '植林者0' || (piece && piece.type === '植林者' && cell.territory === currentTurn)) {
+                if (piece && piece.type === '植林者' && cell.territory === currentTurn) {
                     activePieceDoubleMove = true;
                 } else {
                     activePieceDoubleMove = false;
@@ -720,7 +727,7 @@
             processKingTerritory(to);
         }
 
-        // 【新ルール適用】植林者がターン開始時に自陣にいて、1回目の移動が終わった場合、もう一度同じ駒を動かせる
+        // 【判定】「植林者」であり、かつ「最初から自陣にいて（activePieceDoubleMoveがtrue）」、かつ「まだ1回も動いていない（!hasMovedOnce）」場合のみ2回目を許可
         if (movingPiece.type === '植林者' && activePieceDoubleMove && !hasMovedOnce) {
             hasMovedOnce = true;
             selectedCell = to; // 移動先のマスを選択状態にして維持
